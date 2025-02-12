@@ -28,6 +28,7 @@ cloudpickle==3.1.1
 comm==0.2.2
 contourpy==1.3.1
 cycler==0.12.1
+Cython==3.0.11
 cytoolz==1.0.1
 dacite==1.6.0
 dagshub==0.5.3
@@ -55,7 +56,7 @@ fsspec==2025.2.0
 gitdb==4.0.12
 GitPython==3.1.44
 gql==3.5.0
--e git+ssh://git@gitlab.uzh.ch/liam.tessendorf/graph-reinforcement-learning-using-blockchain-data.git@e0f7fc84036a969452f9706b835f74583fef2176#egg=graph_reinforcement_learning_using_blockchain_data
+-e git+ssh://git@gitlab.uzh.ch/liam.tessendorf/graph-reinforcement-learning-using-blockchain-data.git@439538b0062052703132653b9351c8ba177365f5#egg=graph_reinforcement_learning_using_blockchain_data
 graphql-core==3.2.6
 h11==0.14.0
 hexbytes==1.3.0
@@ -159,6 +160,7 @@ smmap==5.0.2
 sniffio==1.3.1
 soupsieve==2.6
 stack-data==0.6.3
+style==1.1.0
 tenacity==9.0.0
 terminado==0.18.1
 tinycss2==1.4.0
@@ -173,6 +175,7 @@ types-requests==2.32.0.20241016
 typing-inspect==0.9.0
 typing_extensions==4.12.2
 tzdata==2025.1
+update==0.0.1
 uri-template==1.3.0
 urllib3==2.3.0
 wcwidth==0.2.13
