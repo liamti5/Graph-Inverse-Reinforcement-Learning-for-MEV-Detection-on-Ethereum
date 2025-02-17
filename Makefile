@@ -16,7 +16,11 @@ PYTHON_INTERPRETER = python
 requirements:
 	$(PYTHON_INTERPRETER) -m pip install -U pip
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	
+
+## Install Python Dependencies
+.PHONY: update-requirements
+update-requirements:
+	pip freeze > requirements.txt
 
 
 
