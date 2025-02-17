@@ -5,7 +5,6 @@ import random
 
 import dask.dataframe as dd
 import pandas as pd
-import typer
 from aiohttp import ClientResponseError
 from loguru import logger
 from tenacity import retry, wait_exponential, stop_after_attempt
@@ -20,11 +19,13 @@ from graph_reinforcement_learning_using_blockchain_data.config import (
 ALCHEMY_API_URL = os.getenv("ALCHEMY_API_URL")
 random.seed(42)
 
+
 async def gather_with_tqdm(coros, desc="Fetching logs"):
     results = []
     for coro in tqdm(asyncio.as_completed(coros), total=len(coros), desc=desc):
         results.append(await coro)
     return results
+
 
 class Dataset:
     def __init__(self):
@@ -71,13 +72,11 @@ class Dataset:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data_class", choices=["0", "1"], default=None
-    )
+    parser.add_argument("--data_class", choices=["0", "1"], default=None)
 
-    parser.add_argument(
-        "--rows", default=None
-    )
+    parser.add_argument("--rows", default=-1, type=int)
+
+    parser.add_argument("--filename")
 
     args = parser.parse_args()
     assert args.data_class, "Please provide a data class to process"
@@ -85,14 +84,14 @@ def main():
     ds = Dataset()
 
     def _subsample(ddf: dd.DataFrame, rows: int) -> dd.DataFrame:
-        if rows is None:
+        if rows == -1:
             return ddf
         ddf.sort_values(by="block_number", inplace=True)
         dd_subsample = ddf.head(rows)
-        ddf = dd.from_pandas(dd_subsample, npartitions=1)
+        ddf = dd.from_pandas(dd_subsample, npartitions=4)
         return ddf
 
-    def _get_data_class_0(rows: int):
+    def _get_data_class_0(rows: int, filename: str):
         ddf = dd.read_csv(
             EXTERNAL_DATA_DIR / "flashbots" / "Q2_2023" / "arbitrages.csv",
             dtype={
@@ -100,7 +99,7 @@ def main():
                 "error": "object",
                 "profit_amount": "object",
                 "start_amount": "object",
-            }
+            },
         )
         ddf = _subsample(ddf, rows)
         flashbots_tx = set(ddf["transaction_hash"].compute().tolist())
@@ -112,23 +111,20 @@ def main():
             all_txs = ds.fetch_transactions_per_block(block)
             max_normal_per_block = int(0.05 * len(all_txs))
             filtered_txs = [tx for tx in all_txs if tx not in flashbots_tx]
-            if len(filtered_txs) > max_normal_per_block:
-                filtered_txs = random.sample(filtered_txs, max_normal_per_block)
+            # if len(filtered_txs) > max_normal_per_block:
+            #     filtered_txs = random.sample(filtered_txs, max_normal_per_block)
             for tx in filtered_txs:
                 block_numbers.append(block)
                 tx_hashes.append(tx)
 
-        df_class_0 = pd.DataFrame({
-            "block_number": block_numbers,
-            "transaction_hash": tx_hashes
-        })
+        df_class_0 = pd.DataFrame({"block_number": block_numbers, "transaction_hash": tx_hashes})
 
         receipts = ds.fetch_logs_per_transaction(tx_hashes)
         df_class_0["receipt"] = receipts
 
-        df_class_0.to_csv(PROCESSED_DATA_DIR / "flashbots" / "Q2_2023" / "class0_with_logs.csv", index=False)
+        df_class_0.to_csv(PROCESSED_DATA_DIR / "flashbots" / "Q2_2023" / filename, index=False)
 
-    def _get_data_class_1(rows: int):
+    def _get_data_class_1(rows: int, filename: str):
         ddf = dd.read_csv(
             EXTERNAL_DATA_DIR / "flashbots" / "Q2_2023" / "arbitrages.csv",
             dtype={
@@ -136,20 +132,22 @@ def main():
                 "error": "object",
                 "profit_amount": "object",
                 "start_amount": "object",
-            }
+            },
         )
         ddf = _subsample(ddf, rows)
         trxs = ddf["transaction_hash"].compute().tolist()
-        logs = ds.fetch_logs_per_transaction(trxs)
-        ddf["logs"] = logs.get("logs", [])
-        ddf.to_csv(PROCESSED_DATA_DIR / "flashbots" / "Q2_2023" / "arbitrages_with_logs1.csv", index=False)
+        receipts = ds.fetch_logs_per_transaction(trxs)
+
+        df = ddf.compute()
+        df["receipt"] = receipts
+        df.to_csv(PROCESSED_DATA_DIR / "flashbots" / "Q2_2023" / filename, index=False)
 
     logger.info("Processing dataset...")
 
     if args.data_class == "0":
-        _get_data_class_0(int(args.rows))
+        _get_data_class_0(int(args.rows), args.filename)
     elif args.data_class == "1":
-        _get_data_class_1(int(args.rows))
+        _get_data_class_1(int(args.rows), args.filename)
 
     logger.success("Processing dataset complete.")
 
