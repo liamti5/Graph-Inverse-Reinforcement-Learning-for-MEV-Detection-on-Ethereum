@@ -41,6 +41,7 @@ lint:
 .PHONY: format
 format:
 	black --config pyproject.toml graph_reinforcement_learning_using_blockchain_data
+	black --config pyproject.toml notebooks
 
 
 
