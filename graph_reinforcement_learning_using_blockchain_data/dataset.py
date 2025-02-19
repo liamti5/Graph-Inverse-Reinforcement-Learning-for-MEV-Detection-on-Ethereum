@@ -111,8 +111,8 @@ def main():
             all_txs = ds.fetch_transactions_per_block(block)
             max_normal_per_block = int(0.05 * len(all_txs))
             filtered_txs = [tx for tx in all_txs if tx not in flashbots_tx]
-            # if len(filtered_txs) > max_normal_per_block:
-            #     filtered_txs = random.sample(filtered_txs, max_normal_per_block)
+            if len(filtered_txs) > max_normal_per_block:
+                filtered_txs = random.sample(filtered_txs, max_normal_per_block)
             for tx in filtered_txs:
                 block_numbers.append(block)
                 tx_hashes.append(tx)
