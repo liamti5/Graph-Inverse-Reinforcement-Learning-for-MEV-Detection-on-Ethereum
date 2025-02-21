@@ -5,10 +5,8 @@ import typer
 from matplotlib import pyplot as plt
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, confusion_matrix, classification_report
-)
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, \
+    classification_report
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -24,16 +22,15 @@ app = typer.Typer()
 class RandomForestTrainer:
     def grid_search(self, features_to_scale: list):
         preprocessor = ColumnTransformer(
-            transformers=[
-                ('scaler', StandardScaler(), features_to_scale)
-            ],
-            remainder='passthrough'
+            transformers=[("scaler", StandardScaler(), features_to_scale)], remainder="passthrough"
         )
 
-        full_pipeline = Pipeline([
-            ("preprocessor", preprocessor),
-            ("classifier", RandomForestClassifier(random_state=42))
-        ])
+        full_pipeline = Pipeline(
+            [
+                ("preprocessor", preprocessor),
+                ("classifier", RandomForestClassifier(random_state=42)),
+            ]
+        )
 
         param_distributions = {
             "classifier__n_estimators": [100, 200],
@@ -55,42 +52,21 @@ class RandomForestTrainer:
         return grid_search
 
     def train(self, X_train, X_test, y_train, y_test, grid_search, experiment_name):
+        mlflow.sklearn.autolog()
         mlflow.set_experiment(experiment_name)
         with mlflow.start_run():
             best_model = grid_search.fit(X_train, y_train)
 
-            y_train_pred = best_model.predict(X_train)
             y_test_pred = best_model.predict(X_test)
-
-            train_accuracy = accuracy_score(y_train, y_train_pred)
             test_accuracy = accuracy_score(y_test, y_test_pred)
-
-            train_precision = precision_score(y_train, y_train_pred)
             test_precision = precision_score(y_test, y_test_pred)
-
-            train_recall = recall_score(y_train, y_train_pred)
             test_recall = recall_score(y_test, y_test_pred)
-
-            train_f1 = f1_score(y_train, y_train_pred)
             test_f1 = f1_score(y_test, y_test_pred)
 
-            train_roc_auc = roc_auc_score(y_train, best_model.predict_proba(X_train)[:, 1])
-            test_roc_auc = roc_auc_score(y_test, best_model.predict_proba(X_test)[:, 1])
-
-            mlflow.log_param("n_iter", grid_search.n_iter)
-            for param, value in grid_search.best_params_.items():
-                mlflow.log_param(param, value)
-
-            mlflow.log_metric("train_accuracy", train_accuracy)
             mlflow.log_metric("test_accuracy", test_accuracy)
-            mlflow.log_metric("train_precision", train_precision)
             mlflow.log_metric("test_precision", test_precision)
-            mlflow.log_metric("train_recall", train_recall)
             mlflow.log_metric("test_recall", test_recall)
-            mlflow.log_metric("train_f1", train_f1)
             mlflow.log_metric("test_f1", test_f1)
-            mlflow.log_metric("train_roc_auc", train_roc_auc)
-            mlflow.log_metric("test_roc_auc", test_roc_auc)
 
             cm = confusion_matrix(y_test, y_test_pred)
             plt.figure(figsize=(6, 4))
@@ -108,9 +84,7 @@ class RandomForestTrainer:
             report_df.to_csv("classification_report.csv", index=True)
             mlflow.log_artifact("classification_report.csv")
 
-            mlflow.sklearn.log_model(best_model, "random_forest_model")
-
-            return best_model
+        return best_model
 
 
 @app.command()
