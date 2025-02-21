@@ -5,8 +5,14 @@ import typer
 from matplotlib import pyplot as plt
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, \
-    classification_report
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+)
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -18,6 +24,7 @@ from graph_reinforcement_learning_using_blockchain_data import config
 config.load_dotenv()
 
 app = typer.Typer()
+
 
 class RandomForestTrainer:
     def grid_search(self, features_to_scale: list):
