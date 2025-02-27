@@ -47,7 +47,7 @@ class RandomForestTrainer:
             "classifier__max_features": ["sqrt", None],
         }
 
-        grid_search = RandomizedSearchCV(
+        randomized_search = RandomizedSearchCV(
             estimator=full_pipeline,
             param_distributions=param_distributions,
             n_iter=20,
@@ -56,7 +56,7 @@ class RandomForestTrainer:
             verbose=2,
             random_state=42,
         )
-        return grid_search
+        return randomized_search
 
     def train(self, X_train, X_test, y_train, y_test, grid_search, experiment_name):
         mlflow.sklearn.autolog()
@@ -65,17 +65,14 @@ class RandomForestTrainer:
             best_model = grid_search.fit(X_train, y_train)
 
             y_test_pred = best_model.predict(X_test)
-            test_accuracy = accuracy_score(y_test, y_test_pred)
-            test_precision = precision_score(y_test, y_test_pred)
-            test_recall = recall_score(y_test, y_test_pred)
-            test_f1 = f1_score(y_test, y_test_pred)
 
+            test_accuracy, test_precision, test_recall, test_f1 = self.test_metrics(y_test, y_test_pred)
             mlflow.log_metric("test_accuracy", test_accuracy)
             mlflow.log_metric("test_precision", test_precision)
             mlflow.log_metric("test_recall", test_recall)
             mlflow.log_metric("test_f1", test_f1)
 
-            cm = confusion_matrix(y_test, y_test_pred)
+            cm = self.confusion_matrix(y_test, y_test_pred)
             plt.figure(figsize=(6, 4))
             sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
             plt.xlabel("Predicted")
@@ -86,12 +83,28 @@ class RandomForestTrainer:
             mlflow.log_artifact("confusion_matrix.png")
             plt.close()
 
-            report = classification_report(y_test, y_test_pred, output_dict=True)
-            report_df = pd.DataFrame(report).transpose()
+            report_df = self.classification_report(y_test, y_test_pred)
             report_df.to_csv("classification_report.csv", index=True)
             mlflow.log_artifact("classification_report.csv")
 
         return best_model
+
+    def test_metrics(self, y_test, y_test_pred):
+        test_accuracy = accuracy_score(y_test, y_test_pred)
+        test_precision = precision_score(y_test, y_test_pred)
+        test_recall = recall_score(y_test, y_test_pred)
+        test_f1 = f1_score(y_test, y_test_pred)
+
+        return test_accuracy, test_precision, test_recall, test_f1
+
+    def confusion_matrix(self, y_test, y_test_pred):
+        cm = confusion_matrix(y_test, y_test_pred)
+        return cm
+
+    def classification_report(self, y_test, y_test_pred):
+        report = classification_report(y_test, y_test_pred, output_dict=True)
+        report_df = pd.DataFrame(report).transpose()
+        return report_df
 
 
 @app.command()
