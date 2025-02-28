@@ -66,7 +66,9 @@ class RandomForestTrainer:
 
             y_test_pred = best_model.predict(X_test)
 
-            test_accuracy, test_precision, test_recall, test_f1 = self.test_metrics(y_test, y_test_pred)
+            test_accuracy, test_precision, test_recall, test_f1 = self.test_metrics(
+                y_test, y_test_pred
+            )
             mlflow.log_metric("test_accuracy", test_accuracy)
             mlflow.log_metric("test_precision", test_precision)
             mlflow.log_metric("test_recall", test_recall)
