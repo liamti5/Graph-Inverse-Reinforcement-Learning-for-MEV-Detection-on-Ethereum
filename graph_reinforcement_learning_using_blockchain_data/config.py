@@ -14,6 +14,7 @@ DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+FLASHBOTS_Q2_DATA_DIR = DATA_DIR / "processed" / "flashbots" / "Q2_2023"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
 MODELS_DIR = PROJ_ROOT / "models"
