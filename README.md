@@ -6,6 +6,12 @@
 
 A short description of the project.
 
+## ML-Flow
+To start the mlflow server, run 
+```
+mlflow server --host 127.0.0.1 --port 8080
+```
+
 ## Project Organization
 
 `0.01-pjb-data-source-1.ipynb`
