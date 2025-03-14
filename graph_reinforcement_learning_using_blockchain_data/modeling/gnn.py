@@ -258,5 +258,6 @@ def run_experiment(
         mlflow.pytorch.log_model(model, "model")
         return embeddings
 
+
 if __name__ == "__main__":
     pass

@@ -35,7 +35,7 @@ class RandomForestTrainer:
         full_pipeline = Pipeline(
             [
                 ("preprocessor", preprocessor),
-                ("classifier", RandomForestClassifier(random_state=1)),
+                ("classifier", RandomForestClassifier(random_state=2)),
             ]
         )
 
@@ -51,10 +51,10 @@ class RandomForestTrainer:
             estimator=full_pipeline,
             param_distributions=param_distributions,
             n_iter=20,
-            cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=1),
+            cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=2),
             n_jobs=-1,
             verbose=2,
-            random_state=1,
+            random_state=2,
         )
         return randomized_search
 
