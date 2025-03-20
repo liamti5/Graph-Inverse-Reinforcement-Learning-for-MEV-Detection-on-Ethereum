@@ -7,8 +7,16 @@ import torch.nn.functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.callbacks import BaseCallback
+import mlflow
 
 from graph_reinforcement_learning_using_blockchain_data import config
+
+mlflow.set_tracking_uri(uri=config.MLFLOW_TRACKING_URI)
+
+np.random.seed(42)
 
 
 class BlockchainEnv(gym.Env):
@@ -179,93 +187,129 @@ class BlockchainEnv(gym.Env):
 #         values = self.critic(states)  # shape: (max_addresses, 1)
 #         return actions, log_probs, entropy, values
 
+class MLflowLoggingCallback(BaseCallback):
+    def __init__(self, eval_env, eval_freq=1000, verbose=1):
+        super(MLflowLoggingCallback, self).__init__(verbose)
+        self.eval_env = eval_env
+        self.eval_freq = eval_freq
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.eval_freq == 0:
+            mean_reward, std_reward = evaluate_policy(
+                self.model, self.eval_env, n_eval_episodes=5, deterministic=True
+            )
+            mlflow.log_metric("eval_mean_reward", mean_reward, step=self.num_timesteps)
+            mlflow.log_metric("eval_std_reward", std_reward, step=self.num_timesteps)
+        return True
+
 
 def main():
     df = pd.read_csv(config.FLASHBOTS_Q2_DATA_DIR / "features_edges_multiocc.csv")
     max_addresses = df.groupby("blockNumber")["from"].nunique().max()
 
-    env = BlockchainEnv(
-        df,
-        max_num_addresses=max_addresses,
-        embedding_dim=128,
-        feature_cols=[
-            "gasUsed",
-            "cumulativeGasUsed",
-            "effectiveGasPrice",
-            "status",
-            "fee",
-            "num_logs",
-            "dummy_0xd78ad95f",
-            "dummy_0xe1fffcc4",
-            "dummy_0x908fb5ee",
-            "dummy_0xe9149e1b",
-            "dummy_0x1c411e9a",
-            "dummy_0x9d9af8e3",
-            "dummy_0x19b47279",
-            "dummy_0x8201aa3f",
-            "dummy_0xc42079f9",
-            "dummy_0xddf252ad",
-            "dummy_0x17307eab",
-            "dummy_0xddac4093",
-            "dummy_0x8c5be1e5",
-            "dummy_0x7fcf532c",
-        ],
-        alpha=0.3,
-    )
-    flat_env = gym.wrappers.FlattenObservation(env)
-    #
-    # # Run a simple loop over blocks.
-    # agent = PPOAgent(embedding_dim=128, action_dim=2)
-    # optimizer = torch.optim.Adam(agent.parameters(), lr=1e-3)
-    #
-    # num_episodes = 5
-    # for episode in range(num_episodes):
-    #     obs = env.reset()  # obs is a dict with 'states' and 'mask'
-    #     done = False
-    #     total_reward = 0
-    #     total_predictions = 0  # Total number of active address predictions made
-    #     while not done:
-    #         # Count predictions from the current observation using the mask.
-    #         total_predictions += np.sum(obs["mask"])
-    #
-    #         # Agent acts on the current observation.
-    #         actions, log_probs, entropy, values = agent.act(obs)
-    #         # Convert actions to numpy array (env.step requires numpy actions).
-    #         actions_np = actions.numpy().astype(np.int8)
-    #
-    #         # Environment step returns next observation and reward (number of correct predictions in block)
-    #         next_obs, reward, done, _ = env.step(actions_np)
-    #         total_reward += reward
-    #
-    #         obs = next_obs
-    #         # For demonstration, we run one step per block.
-    #     # Compute accuracy for this episode.
-    #     accuracy = total_reward / total_predictions if total_predictions > 0 else 0
-    #     print(
-    #         f"Episode {episode + 1} Reward: {total_reward}, Total Predictions: {total_predictions}, Accuracy: {accuracy:.3f}"
-    #     )
-    check_env(flat_env)
+    unique_blocks = np.sort(df["blockNumber"].unique())
+    split_index = int(0.8 * len(unique_blocks))
+    train_blocks = unique_blocks[:split_index]
+    test_blocks = unique_blocks[split_index:]
+
+    df_train = df[df["blockNumber"].isin(train_blocks)]
+    df_test = df[df["blockNumber"].isin(test_blocks)]
+
+    print(f"Train blocks: {len(train_blocks)}, Test blocks: {len(test_blocks)}")
+
+    max_num_addresses = max_addresses
+    embedding_dim = 128
+    feature_cols = [
+        "gasUsed",
+        "cumulativeGasUsed",
+        "effectiveGasPrice",
+        "status",
+        "fee",
+        "num_logs",
+        "dummy_0xd78ad95f",
+        "dummy_0xe1fffcc4",
+        "dummy_0x908fb5ee",
+        "dummy_0xe9149e1b",
+        "dummy_0x1c411e9a",
+        "dummy_0x9d9af8e3",
+        "dummy_0x19b47279",
+        "dummy_0x8201aa3f",
+        "dummy_0xc42079f9",
+        "dummy_0xddf252ad",
+        "dummy_0x17307eab",
+        "dummy_0xddac4093",
+        "dummy_0x8c5be1e5",
+        "dummy_0x7fcf532c",
+    ]
+    alpha = 0.3
+
+    train_env = BlockchainEnv(df_train, max_num_addresses, embedding_dim, feature_cols, alpha)
+    test_env = BlockchainEnv(df_test, max_num_addresses, embedding_dim, feature_cols, alpha)
+
+    # train_env_flat = gym.wrappers.FlattenObservation(train_env)
+    # test_env_flat = gym.wrappers.FlattenObservation(test_env)
+
+    train_env = Monitor(train_env)
+    test_env = Monitor(test_env)
+
+    check_env(train_env)
+    check_env(test_env)
 
     # Wrap your environment in a DummyVecEnv to make it compatible with SB3.
-    vec_env = DummyVecEnv([lambda: env])
+    vec_train_env = DummyVecEnv([lambda: train_env])
+    vec_test_env = DummyVecEnv([lambda: test_env])
 
-    # Create the PPO model using a standard MLP policy.
-    model = PPO("MultiInputPolicy", vec_env, verbose=1)
+    # Set up MLflow experiment.
+    mlflow.set_experiment("RL PPO soft-update embeddings v1")
+    n_steps = 2048
+    batch_size = 256
+    total_timesteps = len(train_blocks) * 5
 
-    # Train the model for the desired number of timesteps.
-    model.learn(total_timesteps=10)
+    with mlflow.start_run():
+        # Log parameters.
+        mlflow.log_param("max_num_addresses", max_num_addresses)
+        mlflow.log_param("embedding_dim", embedding_dim)
+        mlflow.log_param("alpha", alpha)
+        mlflow.log_param("n_steps", n_steps)
+        mlflow.log_param("batch_size", batch_size)
+        mlflow.log_param("total_timesteps", total_timesteps)
 
-    # Save the trained model.
-    model.save("ppo_blockchain_model")
+        mlflow_callback = MLflowLoggingCallback(eval_env=vec_test_env, eval_freq=1000)
 
-    # Testing the trained agent on your environment:
-    obs = env.reset()
-    done = False
-    while not done:
-        # Use the trained model to predict an action.
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, info = env.step(action)
-        print("Reward for this block:", reward)
+        # Create the PPO model using a standard MLP policy.
+        model = PPO(
+            "MultiInputPolicy",
+            vec_train_env,
+            verbose=1,
+            device="mps",
+            n_steps=n_steps,
+            batch_size=batch_size,
+        )
+
+        # Train the model for the desired number of timesteps.
+        model.learn(total_timesteps=len(train_blocks) * 5, progress_bar=True)
+
+        total_correct = 0
+        total_predictions = 0
+        obs = vec_test_env.reset()  # vec_test_env.reset() returns only the observations
+        done = False
+
+        while not done:
+            # For DummyVecEnv with one environment, obs is a list (or dict) with one element.
+            actions, _ = model.predict(obs, deterministic=True)
+
+            # Retrieve the mask. This depends on how DummyVecEnv returns your observation.
+            # Here we assume obs is a list of dicts.
+            mask = obs[0]["mask"] if isinstance(obs, (list, tuple)) else obs["mask"]
+            total_predictions += mask.sum()
+
+            obs, rewards, done, _ = vec_test_env.step(actions)
+            # rewards is an array; for a single env, we use the first element.
+            total_correct += rewards[0]
+
+        accuracy = total_correct / total_predictions if total_predictions > 0 else 0
+        print(f"Custom Test Accuracy: {accuracy:.3f}")
+        mlflow.log_metric("test_accuracy", accuracy)
 
 
 if __name__ == "__main__":
