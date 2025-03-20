@@ -16,8 +16,9 @@ from sklearn.metrics import (
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from graph_reinforcement_learning_using_blockchain_data import config
 
-mlflow.set_tracking_uri(uri="http://127.0.0.1:8080")
+mlflow.set_tracking_uri(uri=config.MLFLOW_TRACKING_URI)
 
 from graph_reinforcement_learning_using_blockchain_data import config
 
