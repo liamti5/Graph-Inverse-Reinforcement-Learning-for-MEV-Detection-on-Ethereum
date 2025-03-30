@@ -14,6 +14,7 @@ from graph_reinforcement_learning_using_blockchain_data.config import (
 
 app = typer.Typer()
 
+
 def plot_hist(df, label_name):
     sns.set(style="whitegrid")
 

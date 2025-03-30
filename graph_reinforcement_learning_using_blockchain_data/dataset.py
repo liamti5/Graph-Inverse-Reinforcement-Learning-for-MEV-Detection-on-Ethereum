@@ -15,7 +15,7 @@ from web3 import AsyncWeb3, AsyncHTTPProvider
 from graph_reinforcement_learning_using_blockchain_data.config import (
     EXTERNAL_DATA_DIR,
     PROCESSED_DATA_DIR,
-    RAW_DATA_DIR
+    RAW_DATA_DIR,
 )
 
 ALCHEMY_API_URL = os.getenv("ALCHEMY_API_URL")
@@ -39,11 +39,12 @@ class Dataset:
         self.web3 = AsyncWeb3(AsyncHTTPProvider(ALCHEMY_API_URL))
         self.sem = asyncio.Semaphore(5)
 
-
     def fetch_eth_balances(self, accounts: list, block_numbers: list) -> list:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        balances_list = loop.run_until_complete(self._fetch_eth_balances_async(accounts, block_numbers))
+        balances_list = loop.run_until_complete(
+            self._fetch_eth_balances_async(accounts, block_numbers)
+        )
         loop.close()
         return balances_list
 
@@ -56,7 +57,6 @@ class Dataset:
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
 
         tasks = [self._get_logs(tx) for tx in trxs]
         results = loop.run_until_complete(gather_with_tqdm(tasks, desc="Fetching logs"))
@@ -85,10 +85,7 @@ class Dataset:
 
     async def _fetch_eth_balances_async(self, accounts: list, block_numbers: list) -> list:
         unique_pairs = list({(acc, bn) for acc, bn in zip(accounts, block_numbers)})
-        tasks = [
-            self._get_eth_balance(acc, bn)
-            for acc, bn in unique_pairs
-        ]
+        tasks = [self._get_eth_balance(acc, bn) for acc, bn in unique_pairs]
         return await gather_with_tqdm(tasks, desc="Fetching ETH balances")
 
     @retry(wait=wait_exponential(min=1, max=60), stop=stop_after_attempt(5))
@@ -174,7 +171,11 @@ def _get_eth_balances(ds: Dataset, input_file: str, output_file: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_class", choices=["recipts0", "receipts1", "eth_balances0", "eth_balances1"], default=None)
+    parser.add_argument(
+        "--data_class",
+        choices=["recipts0", "receipts1", "eth_balances0", "eth_balances1"],
+        default=None,
+    )
     args0 = parser.parse_args()
 
     match args0:
@@ -187,8 +188,8 @@ def main():
         case "eth_balances1":
             parser.add_argument("--input_filename", default="receipts_class1.csv")
             parser.add_argument("--output_filename", default="eth_balances_class1.csv")
-        case _: raise ArgumentError
-
+        case _:
+            raise ArgumentError
 
     args = parser.parse_args()
     assert args.data_class, "Please provide a data class to process"
@@ -203,7 +204,9 @@ def main():
         case "1":
             _get_data_class_1(ds, int(args.rows), args.output_filename)
         case "eth_balances":
-            logger.info(f"Will get ETH balances for accounts in {args.input_filename} and save as {args.output_filename}")
+            logger.info(
+                f"Will get ETH balances for accounts in {args.input_filename} and save as {args.output_filename}"
+            )
             _get_eth_balances(ds, args.input_filename, args.output_filename)
 
     logger.success("Processing dataset complete.")

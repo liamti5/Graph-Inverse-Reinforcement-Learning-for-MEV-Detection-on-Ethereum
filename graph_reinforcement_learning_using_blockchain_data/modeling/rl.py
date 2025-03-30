@@ -193,6 +193,7 @@ class BlockchainEnv(gym.Env):
 #         values = self.critic(states)  # shape: (max_addresses, 1)
 #         return actions, log_probs, entropy, values
 
+
 class MLflowOutputFormat(KVWriter):
     """
     Dumps key/value pairs into MLflow's numeric format.
@@ -223,7 +224,17 @@ loggers = Logger(
 )
 
 
-def run(vec_train_env, vec_test_env, max_num_addresses, experiment_name, n_steps, batch_size, total_timesteps, embedding_dim, alpha):
+def run(
+    vec_train_env,
+    vec_test_env,
+    max_num_addresses,
+    experiment_name,
+    n_steps,
+    batch_size,
+    total_timesteps,
+    embedding_dim,
+    alpha,
+):
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run():
@@ -245,9 +256,7 @@ def run(vec_train_env, vec_test_env, max_num_addresses, experiment_name, n_steps
 
         model.set_logger(loggers)
 
-        model.learn(
-            total_timesteps=total_timesteps, progress_bar=True, log_interval=1
-        )
+        model.learn(total_timesteps=total_timesteps, progress_bar=True, log_interval=1)
 
         accuracy = test(vec_test_env, model)
         print(f"Custom Test Accuracy: {accuracy:.3f}")
@@ -257,6 +266,7 @@ def run(vec_train_env, vec_test_env, max_num_addresses, experiment_name, n_steps
         model.save(model_path)
         mlflow.log_artifact(model_path)
         os.remove(model_path)
+
 
 def test(vec_test_env, agent):
     total_correct = 0
@@ -349,7 +359,6 @@ def main():
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("total_timesteps", total_timesteps)
 
-
         # Create the PPO model using a standard MLP policy.
         model = PPO(
             "MultiInputPolicy",
@@ -363,9 +372,7 @@ def main():
         model.set_logger(loggers)
 
         # Train the model for the desired number of timesteps.
-        model.learn(
-            total_timesteps=len(train_blocks) * 5, progress_bar=True, log_interval=1
-        )
+        model.learn(total_timesteps=len(train_blocks) * 5, progress_bar=True, log_interval=1)
 
         total_correct = 0
         total_predictions = 0
