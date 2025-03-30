@@ -1,3 +1,7 @@
+import os
+import sys
+from typing import Dict, Any, Union, Tuple
+
 import gymnasium as gym
 import numpy as np
 import pandas as pd
@@ -10,6 +14,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3 import SAC
+from stable_baselines3.common.logger import HumanOutputFormat, KVWriter, Logger
 import mlflow
 
 from graph_reinforcement_learning_using_blockchain_data import config
@@ -187,20 +193,89 @@ class BlockchainEnv(gym.Env):
 #         values = self.critic(states)  # shape: (max_addresses, 1)
 #         return actions, log_probs, entropy, values
 
-class MLflowLoggingCallback(BaseCallback):
-    def __init__(self, eval_env, eval_freq=1000, verbose=1):
-        super(MLflowLoggingCallback, self).__init__(verbose)
-        self.eval_env = eval_env
-        self.eval_freq = eval_freq
+class MLflowOutputFormat(KVWriter):
+    """
+    Dumps key/value pairs into MLflow's numeric format.
+    """
 
-    def _on_step(self) -> bool:
-        if self.n_calls % self.eval_freq == 0:
-            mean_reward, std_reward = evaluate_policy(
-                self.model, self.eval_env, n_eval_episodes=5, deterministic=True
-            )
-            mlflow.log_metric("eval_mean_reward", mean_reward, step=self.num_timesteps)
-            mlflow.log_metric("eval_std_reward", std_reward, step=self.num_timesteps)
-        return True
+    def write(
+        self,
+        key_values: Dict[str, Any],
+        key_excluded: Dict[str, Union[str, Tuple[str, ...]]],
+        step: int = 0,
+    ) -> None:
+
+        for (key, value), (_, excluded) in zip(
+            sorted(key_values.items()), sorted(key_excluded.items())
+        ):
+
+            if excluded is not None and "mlflow" in excluded:
+                continue
+
+            if isinstance(value, np.ScalarType):
+                if not isinstance(value, str):
+                    mlflow.log_metric(key, value, step)
+
+
+loggers = Logger(
+    folder=None,
+    output_formats=[HumanOutputFormat(sys.stdout), MLflowOutputFormat()],
+)
+
+
+def run(vec_train_env, vec_test_env, max_num_addresses, experiment_name, n_steps, batch_size, total_timesteps, embedding_dim, alpha):
+    mlflow.set_experiment(experiment_name)
+
+    with mlflow.start_run():
+        mlflow.log_param("max_num_addresses", max_num_addresses)
+        mlflow.log_param("embedding_dim", embedding_dim)
+        mlflow.log_param("alpha", alpha)
+        mlflow.log_param("n_steps", n_steps)
+        mlflow.log_param("batch_size", batch_size)
+        mlflow.log_param("total_timesteps", total_timesteps)
+
+        model = PPO(
+            "MultiInputPolicy",
+            vec_train_env,
+            verbose=1,
+            device="mps",
+            n_steps=n_steps,
+            batch_size=batch_size,
+        )
+
+        model.set_logger(loggers)
+
+        model.learn(
+            total_timesteps=total_timesteps, progress_bar=True, log_interval=1
+        )
+
+        accuracy = test(vec_test_env, model)
+        print(f"Custom Test Accuracy: {accuracy:.3f}")
+        mlflow.log_metric("test_accuracy", accuracy)
+
+        model_path = f"{experiment_name}.zip"
+        model.save(model_path)
+        mlflow.log_artifact(model_path)
+        os.remove(model_path)
+
+def test(vec_test_env, agent):
+    total_correct = 0
+    total_predictions = 0
+    obs = vec_test_env.reset()  # vec_test_env.reset() returns only the observations
+    print(obs)
+    done = False
+
+    while not done:
+        actions, _ = agent.predict(obs, deterministic=True)
+
+        mask = obs[0]["mask"] if isinstance(obs, (list, tuple)) else obs["mask"]
+        total_predictions += mask.sum()
+
+        obs, rewards, done, _ = vec_test_env.step(actions)
+        total_correct += rewards[0]
+
+    accuracy = total_correct / total_predictions if total_predictions > 0 else 0
+    return accuracy
 
 
 def main():
@@ -274,7 +349,6 @@ def main():
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("total_timesteps", total_timesteps)
 
-        mlflow_callback = MLflowLoggingCallback(eval_env=vec_test_env, eval_freq=1000)
 
         # Create the PPO model using a standard MLP policy.
         model = PPO(
@@ -286,8 +360,12 @@ def main():
             batch_size=batch_size,
         )
 
+        model.set_logger(loggers)
+
         # Train the model for the desired number of timesteps.
-        model.learn(total_timesteps=len(train_blocks) * 5, progress_bar=True)
+        model.learn(
+            total_timesteps=len(train_blocks) * 5, progress_bar=True, log_interval=1
+        )
 
         total_correct = 0
         total_predictions = 0
@@ -310,6 +388,11 @@ def main():
         accuracy = total_correct / total_predictions if total_predictions > 0 else 0
         print(f"Custom Test Accuracy: {accuracy:.3f}")
         mlflow.log_metric("test_accuracy", accuracy)
+
+        model_path = "ppo_soft_embeddings_v1.zip"
+        model.save(model_path)
+        mlflow.log_artifact(model_path)
+        os.remove(model_path)
 
 
 if __name__ == "__main__":
