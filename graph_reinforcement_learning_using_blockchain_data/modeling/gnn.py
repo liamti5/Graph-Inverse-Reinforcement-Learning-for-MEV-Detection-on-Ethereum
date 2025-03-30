@@ -198,7 +198,7 @@ def train(model, loader, optimizer, criterion, device):
     return total_loss / len(loader.dataset)
 
 
-def test(model, loader, criterion, device, return_embeddings):
+def test(model, loader, criterion, device, return_embeddings) -> (float, float, dict):
     model.eval()
     total_loss = 0
     correct = 0
