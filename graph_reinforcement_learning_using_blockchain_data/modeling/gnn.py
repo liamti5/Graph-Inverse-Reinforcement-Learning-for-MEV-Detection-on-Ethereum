@@ -247,16 +247,14 @@ def run_experiment(
                 model, test_loader, criterion, device, return_embeddings
             )
 
-            # Log metrics manually (per epoch)
             mlflow.log_metric("train_loss", train_loss, step=epoch)
             mlflow.log_metric("test_loss", test_loss, step=epoch)
             mlflow.log_metric("test_accuracy", test_acc, step=epoch)
 
             print(f"Epoch: {epoch:03d}, Train Loss: {train_loss:.4f}, Test Acc: {test_acc:.4f}")
 
-        # Optionally log the final model artifact
         mlflow.pytorch.log_model(model, "model")
-        return embeddings
+        return model, embeddings
 
 
 if __name__ == "__main__":
