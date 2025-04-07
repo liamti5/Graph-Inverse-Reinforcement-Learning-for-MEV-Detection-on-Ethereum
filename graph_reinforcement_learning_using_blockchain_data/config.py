@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -23,6 +24,8 @@ REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
 MLFLOW_TRACKING_URI = "http://127.0.0.1:8080"
+
+RNG = np.random.default_rng(seed=42)
 
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
