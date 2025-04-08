@@ -1,11 +1,9 @@
 # graph-reinforcement-learning-using-blockchain-data
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
-[![Poetry](https://img.shields.io/badge/poetry-1.8.2-blue?logo=python&label=poetry)](https://python-poetry.org/)
+[![CCDS](https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter)](https://cookiecutter-data-science.drivendata.org/)
+[![Poetry](https://img.shields.io/badge/poetry-1.8.5-blue?logo=python&label=poetry)](https://python-poetry.org/)
 [![Stable-Baselines3](https://img.shields.io/badge/stable_baselines3-v2.2.1-green)](https://stable-baselines3.readthedocs.io/en/master/)
-[![Imitation](https://img.shields.io/badge/imitation-v1.0.0-brightgreen)](https://imitation.readthedocs.io/en/latest/)
+[![Imitation](https://img.shields.io/badge/imitation-v1.0.1-brightgreen)](https://imitation.readthedocs.io/en/latest/)
 
 A short description of the project.
 
