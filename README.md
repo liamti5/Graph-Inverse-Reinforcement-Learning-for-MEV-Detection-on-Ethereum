@@ -4,6 +4,7 @@
 [![Poetry](https://img.shields.io/badge/poetry-1.8.5-blue?logo=python&label=poetry)](https://python-poetry.org/)
 [![Stable-Baselines3](https://img.shields.io/badge/stable_baselines3-v2.2.1-green)](https://stable-baselines3.readthedocs.io/en/master/)
 [![Imitation](https://img.shields.io/badge/imitation-v1.0.1-brightgreen)](https://imitation.readthedocs.io/en/latest/)
+[![MLflow](https://img.shields.io/badge/mlflow-v2.20.2-orange?logo=mlflow)](https://mlflow.org/)
 
 A short description of the project.
 
