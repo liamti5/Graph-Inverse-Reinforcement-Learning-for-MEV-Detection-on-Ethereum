@@ -1,12 +1,14 @@
 import os
 import pickle
-from datetime import datetime, timedelta
-from random import uniform
+from datetime import datetime
+from typing import Dict, Any, Union, Tuple
 
+import mlflow
+import numpy as np
 import torch as th
 from imitation.rewards import reward_nets
 from stable_baselines3.common import base_class
-from stable_baselines3.ppo import PPO
+from stable_baselines3.common.logger import KVWriter
 
 
 def save_model(
@@ -38,3 +40,27 @@ def save_model(
     # Save the training statistics
     with open(f"{path}/{ts}_stats.pkl", "wb") as f:
         pickle.dump(stats, f)
+
+
+class MLflowOutputFormat(KVWriter):
+    """
+    Dumps key/value pairs into MLflow's numeric format.
+    """
+
+    def write(
+        self,
+        key_values: Dict[str, Any],
+        key_excluded: Dict[str, Union[str, Tuple[str, ...]]],
+        step: int = 0,
+    ) -> None:
+
+        for (key, value), (_, excluded) in zip(
+            sorted(key_values.items()), sorted(key_excluded.items())
+        ):
+
+            if excluded is not None and "mlflow" in excluded:
+                continue
+
+            if isinstance(value, np.ScalarType):
+                if not isinstance(value, str):
+                    mlflow.log_metric(key, value, step)
