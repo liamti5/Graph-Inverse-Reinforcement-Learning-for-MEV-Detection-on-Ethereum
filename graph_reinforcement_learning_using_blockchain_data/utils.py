@@ -5,7 +5,9 @@ from typing import Dict, Any, Union, Tuple
 
 import mlflow
 import numpy as np
+import torch
 import torch as th
+import torch.nn.functional as F
 from imitation.rewards import reward_nets
 from stable_baselines3.common import base_class
 from stable_baselines3.common.logger import KVWriter
@@ -40,6 +42,21 @@ def save_model(
     # Save the training statistics
     with open(f"{path}/{ts}_stats.pkl", "wb") as f:
         pickle.dump(stats, f)
+
+def pad_features(x: torch.tensor, max_length: int) -> torch.tensor:
+    """
+    Pads features (x) of a graph to a max length.
+
+    :param x:
+    :param max_length:
+    :return:
+    """
+    current_dim = x.size(1)
+    if current_dim < max_length:
+        pad_amount = max_length - current_dim
+
+        x = F.pad(x, (0, pad_amount), "constant", 0)
+    return x
 
 
 class MLflowOutputFormat(KVWriter):
