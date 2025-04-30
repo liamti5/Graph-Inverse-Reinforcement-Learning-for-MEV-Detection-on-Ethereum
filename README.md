@@ -5,7 +5,7 @@
 [![MLflow](https://img.shields.io/badge/mlflow-v2.20.2-orange?logo=mlflow)](https://mlflow.org/)
 [![Stable-Baselines3](https://img.shields.io/badge/stable_baselines3-v2.2.1-green)](https://stable-baselines3.readthedocs.io/en/master/)
 [![Imitation](https://img.shields.io/badge/imitation-v1.0.1-brightgreen)](https://imitation.readthedocs.io/en/latest/)
-![PyTorch Geometric](https://img.shields.io/pypi/v/torch-geometric?label=PyG&color=blue)(https://pytorch-geometric.readthedocs.io/en/latest/index.html)
+[![PyTorch Geometric](https://img.shields.io/pypi/v/torch-geometric?label=PyG&color=blue)](https://pytorch-geometric.readthedocs.io/en/latest/index.html)
 
 A short description of the project.
 
