@@ -76,7 +76,7 @@ class Dataset:
     async def _get_logs(self, tx_hash: str) -> list:
         async with self.sem:
             try:
-                receipt = await self.web3.eth.wait_for_transaction_receipt(tx_hash)
+                receipt = await self.web3.eth.get_transaction_receipt(tx_hash)
                 return receipt
             except ClientResponseError as e:
                 if e.status == 429:
