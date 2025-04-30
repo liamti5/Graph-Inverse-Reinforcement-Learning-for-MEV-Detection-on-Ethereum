@@ -1,10 +1,15 @@
+from typing import Dict, Tuple, Union, Any
+
 import mlflow
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import typer
+from torch_geometric.data import Data, Batch
+from torch_geometric.loader import DataLoader
 from torch_geometric.nn import SAGEConv
 from torch_geometric.nn import global_mean_pool
+from torch_geometric.nn.models import DeepGraphInfomax
 from tqdm import tqdm
 
 from graph_reinforcement_learning_using_blockchain_data import config
@@ -15,7 +20,7 @@ app = typer.Typer()
 
 
 class GraphSAGE(nn.Module):
-    def __init__(self, num_node_features, hidden_channels, num_classes):
+    def __init__(self, num_node_features: int, hidden_channels: int, num_classes: int) -> None:
         torch.manual_seed(42)
         super(GraphSAGE, self).__init__()
         self.conv1 = SAGEConv(num_node_features, hidden_channels)
@@ -25,7 +30,8 @@ class GraphSAGE(nn.Module):
         self.fc1 = nn.Linear(hidden_channels, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
-    def forward(self, data, return_embeddings=False):
+    def forward(self, data: Union[Data, Batch], return_embeddings: bool = False) -> Union[
+        torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         # 1. embeddings
         x, edge_index = data.x, data.edge_index
         x = F.relu(self.conv1(x, edge_index))
@@ -39,14 +45,82 @@ class GraphSAGE(nn.Module):
         # 3. final classifier
         embeddings = self.fc1(x)
         x = F.dropout(embeddings, p=0.5, training=self.training)
-        x = self.fc2(x)
-        if return_embeddings:
-            return x, embeddings
-        else:
-            return x
+        out = self.fc2(x)
+
+        return (out, embeddings) if return_embeddings else out
 
 
-def train(model, loader, optimizer, criterion, device):
+# DGI
+class SAGEEncoder(nn.Module):
+    def __init__(self, num_node_features: int, hidden: int) -> None:
+        super().__init__()
+        self.convs = nn.ModuleList([
+            SAGEConv(num_node_features, hidden),
+            SAGEConv(hidden, hidden),
+            SAGEConv(hidden, hidden),
+            SAGEConv(hidden, hidden),
+        ])
+
+    def forward(self, data: Union[Data, Batch]) -> torch.Tensor:
+        x, edge_index = data.x, data.edge_index
+        for conv in self.convs:
+            x = F.relu(conv(x, edge_index))
+        return x  # (num_nodes, hidden)
+
+
+class GraphSAGEClassifier(nn.Module):
+    def __init__(self, encoder: SAGEEncoder, hidden: int, num_classes: int) -> None:
+        super().__init__()
+        self.encoder = encoder  # ← weights already trained
+        self.fc1 = nn.Linear(hidden, 128)
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, data: Union[Data, Batch], return_embeddings: bool = False) -> Union[
+        torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        x = self.encoder(data)
+        x = global_mean_pool(x, data.batch, size=data.num_graphs)
+        embeddings = self.fc1(x)
+        x = F.dropout(embeddings, p=0.5, training=self.training)
+        out = self.fc2(x)
+        return (out, embeddings) if return_embeddings else out
+
+
+def pretrain_dgi(
+        loader: DataLoader,
+        dgi: DeepGraphInfomax,
+        device: torch.device,
+        epochs: int = 10
+) -> SAGEEncoder:
+    mlflow.set_experiment("DGI")
+    mlflow.pytorch.autolog()
+    with mlflow.start_run():
+        opt = torch.optim.Adam(dgi.parameters(), lr=1e-3)
+        for epoch in tqdm(range(epochs)):
+            dgi.train()
+            tot = 0
+            for data in loader:
+                data = data.to(device)
+                opt.zero_grad()
+                pos_z, neg_z, summary = dgi(data)
+                loss = dgi.loss(pos_z, neg_z, summary)
+                loss.backward()
+                opt.step()
+                tot += loss.item()
+
+            mlflow.log_metric("loss", tot / len(loader), step=epoch)
+            print(f'[DGI] epoch {epoch + 1:02d}  loss={tot / len(loader):.4f}')
+
+        mlflow.pytorch.log_model(dgi, "model")
+        return dgi.encoder  # pretrained encoder ready for downstream
+
+
+def train(
+        model: nn.Module,
+        loader: DataLoader,
+        optimizer: torch.optim.Optimizer,
+        criterion: nn.Module,
+        device: torch.device
+) -> float:
     model.train()
     total_loss = 0
     for data in loader:
@@ -62,7 +136,13 @@ def train(model, loader, optimizer, criterion, device):
     return total_loss / len(loader.dataset)
 
 
-def test(model, loader, criterion, device, return_embeddings) -> (float, float, dict):
+def test(
+        model: nn.Module,
+        loader: DataLoader,
+        criterion: nn.Module,
+        device: torch.device,
+        return_embeddings: bool
+) -> Tuple[float, float, Dict[Any, torch.Tensor]]:
     model.eval()
     total_loss = 0
     correct = 0
@@ -90,16 +170,40 @@ def test(model, loader, criterion, device, return_embeddings) -> (float, float, 
 
 @app.command()
 def run_experiment(
-    experiment_name,
-    num_epochs,
-    model,
-    train_loader,
-    test_loader,
-    optimizer,
-    criterion,
-    device,
-    return_embeddings=False,
-):
+        experiment_name: str,
+        num_epochs: int,
+        model: nn.Module,
+        train_loader: DataLoader,
+        test_loader: DataLoader,
+        optimizer: torch.optim.Optimizer,
+        criterion: nn.Module,
+        device: torch.device,
+        return_embeddings: bool = False,
+) -> Tuple[nn.Module, Dict[Any, torch.Tensor]]:
+    """
+    Run a complete model training experiment with MLflow tracking.
+
+    This function trains a graph neural network model for a specified number of epochs,
+    evaluates it on a test set, and logs metrics to MLflow. It supports returning node
+    embeddings for downstream tasks.
+
+    Args:
+        experiment_name: Name for the MLflow experiment
+        num_epochs: Number of training epochs to run
+        model: Neural network model to train
+        train_loader: DataLoader containing the training dataset
+        test_loader: DataLoader containing the test dataset
+        optimizer: PyTorch optimizer for model training
+        criterion: Loss function for training
+        device: Torch device to use for computation (CPU/GPU)
+        return_embeddings: Whether to compute and return node embeddings
+
+    Returns:
+        A tuple containing:
+            - The trained model
+            - A dictionary mapping transaction IDs to their embeddings (if return_embeddings=True)
+              or an empty dictionary (if return_embeddings=False)
+    """
     mlflow.set_experiment(experiment_name)
     mlflow.pytorch.autolog()
 
