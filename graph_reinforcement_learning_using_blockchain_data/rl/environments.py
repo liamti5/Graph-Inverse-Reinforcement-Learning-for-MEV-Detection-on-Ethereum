@@ -236,7 +236,7 @@ class TransactionGraphEnvV2(gym.Env):
                 "trajectory": self.current_trajectory,
             }
 
-            # move to next account
+            # move to the next account
             self.account_index += 1
             self.transaction_index = 0
             if self.account_index < len(self.accounts):
