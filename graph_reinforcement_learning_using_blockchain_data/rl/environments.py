@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch_geometric.data import Batch
+from torch_geometric.nn import global_mean_pool
 import requests
 
 import graph_reinforcement_learning_using_blockchain_data as grl
@@ -15,11 +16,11 @@ mlflow.set_tracking_uri(uri=config.MLFLOW_TRACKING_URI)
 
 class TransactionGraphEnv(gym.Env):
     def __init__(
-            self,
-            df: pd.DataFrame,
-            alpha: float,
-            label: int,
-            device: torch.device = torch.device("cpu"),
+        self,
+        df: pd.DataFrame,
+        alpha: float,
+        label: int,
+        device: torch.device = torch.device("cpu"),
     ):
         self.df = df.copy()
         self.accounts = df["from"].unique()
@@ -43,7 +44,7 @@ class TransactionGraphEnv(gym.Env):
         self.current_trajectory = []
         self.current_account_transactions = self.df[
             self.df["from"] == self.accounts[self.account_index]
-            ]
+        ]
         self.current_account_transactions = self.current_account_transactions.sort_values(
             by=["blockNumber"]
         )
@@ -93,7 +94,7 @@ class TransactionGraphEnv(gym.Env):
             if self.account_index < len(self.accounts):
                 self.current_account_transactions = self.df[
                     self.df["from"] == self.accounts[self.account_index]
-                    ]
+                ]
                 self.current_account_transactions = self.current_account_transactions.sort_values(
                     by=["blockNumber"]
                 )
@@ -106,11 +107,14 @@ class TransactionGraphEnv(gym.Env):
 
 class TransactionGraphEnvV2(gym.Env):
     def __init__(
-            self,
-            df: pd.DataFrame,
-            alpha: float,
-            label: int,
-            device: torch.device = torch.device("cpu"),
+        self,
+        df: pd.DataFrame,
+        alpha: float,
+        label: int,
+        device: torch.device = torch.device("cpu"),
+        model_uri: str = "mlflow-artifacts:/748752183556303764/465d6f94d00b4fe2bef4d8885ed7be39/artifacts/model",
+        observation_space_dim: int = 128,
+        case: str = "supervised",
     ):
         try:
             response = requests.get(config.MLFLOW_TRACKING_URI, timeout=3)
@@ -119,10 +123,10 @@ class TransactionGraphEnvV2(gym.Env):
             raise RuntimeError(
                 f"Could not connect to the MLflow tracking server at {config.MLFLOW_TRACKING_URI}. Have you started it? Original error: {e}"
             )
-        model_uri = (
-            "mlflow-artifacts:/748752183556303764/465d6f94d00b4fe2bef4d8885ed7be39/artifacts/model"
-        )
-        self.gnn = mlflow.pytorch.load_model(model_uri)
+        model_uri = model_uri
+        self.case = case
+        model = mlflow.pytorch.load_model(model_uri)
+        self.gnn = model if self.case == "supervised" else model.encoder
         self.device = device
         self.gnn.to(device)
         self.label = label
@@ -136,7 +140,7 @@ class TransactionGraphEnvV2(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(128,),
+            shape=(observation_space_dim,),
             dtype=np.float32,
         )
         self.action_space = gym.spaces.Discrete(2)
@@ -150,7 +154,7 @@ class TransactionGraphEnvV2(gym.Env):
         self.current_trajectory = []
         self.current_account_transactions = self.df[
             self.df["from"] == self.accounts[self.account_index]
-            ]
+        ]
         self.current_account_transactions = self.current_account_transactions.sort_values(
             by=["blockNumber"]
         )
@@ -158,14 +162,21 @@ class TransactionGraphEnvV2(gym.Env):
 
     def _obs(self):
         start_idx = max(0, self.transaction_index - 1 - self.window_size)
-        current_trxs = self.current_account_transactions.iloc[start_idx:self.transaction_index].copy()
+        current_trxs = self.current_account_transactions.iloc[
+            start_idx : self.transaction_index
+        ].copy()
 
         graph = grl.create_group_transaction_graph(current_trxs, self.label)[-1]
         graph.x = grl.pad_features(graph.x, 51)
         data = Batch.from_data_list([graph])
         with torch.no_grad():
             data = data.to(self.device)
-            _, embeddings = self.gnn(data, return_embeddings=True)
+
+            if self.case == "supervised":
+                _, embeddings = self.gnn(data, return_embeddings=True)
+            else:
+                z_nodes = self.gnn(data)
+                embeddings = global_mean_pool(z_nodes, data.batch)
 
         return embeddings.cpu().detach().numpy().squeeze(0)
 
@@ -184,22 +195,24 @@ class TransactionGraphEnvV2(gym.Env):
         if action != actual_action:
             current_trx["action"] = action
             if action == 1:
-                current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx["gasUsed"] * (
-                        current_trx["median_gas_price"] + current_trx["std_gas_price"]
-                )
+                current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx[
+                    "gasUsed"
+                ] * (current_trx["median_gas_price"] + current_trx["std_gas_price"])
 
             else:
-                current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx["gasUsed"] * (
-                        current_trx["median_gas_price"] - current_trx["std_gas_price"]
-                )
+                current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx[
+                    "gasUsed"
+                ] * (current_trx["median_gas_price"] - current_trx["std_gas_price"])
             self.current_account_transactions.iloc[self.transaction_index] = current_trx
 
             obs = self._obs()
 
         else:
             current_trx["action"] = action
-            current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx["gasUsed"] * current_trx[
-                "effectiveGasPrice"]
+            current_trx["eth_balance"] = (
+                previous_trx["eth_balance"]
+                - current_trx["gasUsed"] * current_trx["effectiveGasPrice"]
+            )
 
             self.current_account_transactions.iloc[self.transaction_index] = current_trx
 
@@ -242,7 +255,7 @@ class TransactionGraphEnvV2(gym.Env):
             if self.account_index < len(self.accounts):
                 self.current_account_transactions = self.df[
                     self.df["from"] == self.accounts[self.account_index]
-                    ]
+                ]
                 self.current_account_transactions = self.current_account_transactions.sort_values(
                     by=["blockNumber"]
                 )
