@@ -11,7 +11,15 @@ from .config import (
     FLASHBOTS_Q2_DATA_DIR,
 )
 from .graphs import create_group_transaction_graph
-from .modeling.gnn import run_experiment, train, test, GraphSAGE, SAGEEncoder, GraphSAGEClassifier, pretrain_dgi
+from .modeling.gnn import (
+    run_experiment,
+    train,
+    test,
+    GraphSAGE,
+    SAGEEncoder,
+    GraphSAGEClassifier,
+    pretrain_dgi,
+)
 from .modeling.random_forest import RandomForestTrainer
 from .plots import plot_hist
 from .rl.environments import TransactionGraphEnv, TransactionGraphEnvV2

@@ -30,8 +30,9 @@ class GraphSAGE(nn.Module):
         self.fc1 = nn.Linear(hidden_channels, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
-    def forward(self, data: Union[Data, Batch], return_embeddings: bool = False) -> Union[
-        torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(
+        self, data: Union[Data, Batch], return_embeddings: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         # 1. embeddings
         x, edge_index = data.x, data.edge_index
         x = F.relu(self.conv1(x, edge_index))
@@ -54,12 +55,14 @@ class GraphSAGE(nn.Module):
 class SAGEEncoder(nn.Module):
     def __init__(self, num_node_features: int, hidden: int) -> None:
         super().__init__()
-        self.convs = nn.ModuleList([
-            SAGEConv(num_node_features, hidden),
-            SAGEConv(hidden, hidden),
-            SAGEConv(hidden, hidden),
-            SAGEConv(hidden, hidden),
-        ])
+        self.convs = nn.ModuleList(
+            [
+                SAGEConv(num_node_features, hidden),
+                SAGEConv(hidden, hidden),
+                SAGEConv(hidden, hidden),
+                SAGEConv(hidden, hidden),
+            ]
+        )
 
     def forward(self, data: Union[Data, Batch]) -> torch.Tensor:
         x, edge_index = data.x, data.edge_index
@@ -75,8 +78,9 @@ class GraphSAGEClassifier(nn.Module):
         self.fc1 = nn.Linear(hidden, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
-    def forward(self, data: Union[Data, Batch], return_embeddings: bool = False) -> Union[
-        torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(
+        self, data: Union[Data, Batch], return_embeddings: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         x = self.encoder(data)
         x = global_mean_pool(x, data.batch, size=data.num_graphs)
         embeddings = self.fc1(x)
@@ -86,10 +90,7 @@ class GraphSAGEClassifier(nn.Module):
 
 
 def pretrain_dgi(
-        loader: DataLoader,
-        dgi: DeepGraphInfomax,
-        device: torch.device,
-        epochs: int = 10
+    loader: DataLoader, dgi: DeepGraphInfomax, device: torch.device, epochs: int = 10
 ) -> SAGEEncoder:
     mlflow.set_experiment("DGI")
     mlflow.pytorch.autolog()
@@ -108,18 +109,18 @@ def pretrain_dgi(
                 tot += loss.item()
 
             mlflow.log_metric("loss", tot / len(loader), step=epoch)
-            print(f'[DGI] epoch {epoch + 1:02d}  loss={tot / len(loader):.4f}')
+            print(f"[DGI] epoch {epoch + 1:02d}  loss={tot / len(loader):.4f}")
 
         mlflow.pytorch.log_model(dgi, "model")
         return dgi.encoder  # pretrained encoder ready for downstream
 
 
 def train(
-        model: nn.Module,
-        loader: DataLoader,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        device: torch.device
+    model: nn.Module,
+    loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    criterion: nn.Module,
+    device: torch.device,
 ) -> float:
     model.train()
     total_loss = 0
@@ -137,11 +138,11 @@ def train(
 
 
 def test(
-        model: nn.Module,
-        loader: DataLoader,
-        criterion: nn.Module,
-        device: torch.device,
-        return_embeddings: bool
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    return_embeddings: bool,
 ) -> Tuple[float, float, Dict[Any, torch.Tensor]]:
     model.eval()
     total_loss = 0
@@ -170,15 +171,15 @@ def test(
 
 @app.command()
 def run_experiment(
-        experiment_name: str,
-        num_epochs: int,
-        model: nn.Module,
-        train_loader: DataLoader,
-        test_loader: DataLoader,
-        optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
-        device: torch.device,
-        return_embeddings: bool = False,
+    experiment_name: str,
+    num_epochs: int,
+    model: nn.Module,
+    train_loader: DataLoader,
+    test_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    criterion: nn.Module,
+    device: torch.device,
+    return_embeddings: bool = False,
 ) -> Tuple[nn.Module, Dict[Any, torch.Tensor]]:
     """
     Run a complete model training experiment with MLflow tracking.

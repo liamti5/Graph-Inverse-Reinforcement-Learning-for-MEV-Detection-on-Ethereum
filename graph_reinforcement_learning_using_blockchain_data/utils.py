@@ -43,6 +43,7 @@ def save_model(
     with open(f"{path}/{ts}_stats.pkl", "wb") as f:
         pickle.dump(stats, f)
 
+
 def pad_features(x: torch.tensor, max_length: int) -> torch.tensor:
     """
     Pads features (x) of a graph to a max length.
