@@ -131,20 +131,15 @@ def create_group_transaction_graph(group_df, label):
             degree[dst] += 1
         degree = torch.tensor(degree, dtype=torch.float).unsqueeze(1)
 
-        # --- Add balances to the node features ---
-        # Create a reverse mapping: node id -> account address.
+
         reverse_mapping = {v: k for k, v in group_account_mapping.items()}
-        # Determine all tokens seen in the balances (fixed order).
         all_tokens = sorted({token for bal in group_balances.values() for token in bal.keys()})
         node_features = []
         for i in range(num_nodes):
             account = reverse_mapping[i]
-            # Start with the node's degree.
             deg = degree[i].item()
-            # Get the balance dictionary for this account (if any) and produce a vector.
             balances = group_balances.get(account, {})
             token_features = [balances.get(token, 0) for token in all_tokens]
-            # Concatenate degree with balance features.
             node_features.append([deg] + token_features)
 
         node_features_tensor = torch.tensor(node_features, dtype=torch.float)

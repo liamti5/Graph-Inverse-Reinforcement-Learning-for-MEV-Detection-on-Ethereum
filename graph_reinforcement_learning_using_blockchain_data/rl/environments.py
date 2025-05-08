@@ -172,11 +172,11 @@ class TransactionGraphEnvV2(gym.Env):
         with torch.no_grad():
             data = data.to(self.device)
 
-            if self.case == "supervised":
-                _, embeddings = self.gnn(data, return_embeddings=True)
-            else:
+            if self.case != "supervised":
                 z_nodes = self.gnn(data)
                 embeddings = global_mean_pool(z_nodes, data.batch)
+            else:
+                _, embeddings = self.gnn(data, return_embeddings=True)
 
         return embeddings.cpu().detach().numpy().squeeze(0)
 
