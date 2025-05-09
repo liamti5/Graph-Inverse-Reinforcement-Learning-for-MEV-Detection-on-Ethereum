@@ -75,7 +75,7 @@ class RandomForestTrainer:
             mlflow.log_metric("test_recall", test_recall)
             mlflow.log_metric("test_f1", test_f1)
 
-            cm = self.confusion_matrix(y_test, y_test_pred)
+            cm = confusion_matrix(y_test, y_test_pred)
             plt.figure(figsize=(6, 4))
             sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
             plt.xlabel("Predicted")
@@ -99,10 +99,6 @@ class RandomForestTrainer:
         test_f1 = f1_score(y_test, y_test_pred)
 
         return test_accuracy, test_precision, test_recall, test_f1
-
-    def confusion_matrix(self, y_test, y_test_pred):
-        cm = confusion_matrix(y_test, y_test_pred)
-        return cm
 
     def classification_report(self, y_test, y_test_pred):
         report = classification_report(y_test, y_test_pred, output_dict=True)
