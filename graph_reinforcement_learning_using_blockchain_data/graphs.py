@@ -131,7 +131,6 @@ def create_group_transaction_graph(group_df, label):
             degree[dst] += 1
         degree = torch.tensor(degree, dtype=torch.float).unsqueeze(1)
 
-
         reverse_mapping = {v: k for k, v in group_account_mapping.items()}
         all_tokens = sorted({token for bal in group_balances.values() for token in bal.keys()})
         node_features = []
