@@ -21,14 +21,19 @@ def save_model(
     ts: datetime,
 ) -> None:
     """
-    Saves the model to the specified path.
+    Saves the model components required for later restoration or evaluation.
 
-    Args:
-        learner: Learner policy.
-        reward_net: Reward network.
-        stats: Training statistics.
-        path: Path to save the model to.
-        ts: Timestamp to include in the file names.
+    This function saves the given components of a model to the specified path
+    to allow for persistence of training processes and results. It stores the
+    learner, the reward network, and training statistics in files within the
+    provided directory. If the directory does not exist, it is created.
+
+    :param learner: The primary model that implements a base algorithm
+    :param reward_net: The neural network that represents the reward function
+    :param stats: Dictionary containing training statistics
+    :param path: Directory path where components should be saved
+    :param ts: Timestamp to label the saved components
+    :return: None
     """
     # Create the directory if it does not exist
     os.makedirs(path, exist_ok=True)
@@ -46,11 +51,15 @@ def save_model(
 
 def pad_features(x: torch.tensor, max_length: int) -> torch.tensor:
     """
-    Pads features (x) of a graph to a max length.
+    Pads a tensor to a specified maximum length along the second dimension. If the current
+    dimension is less than the maximum length, it will pad the tensor with zeros until the
+    maximum length is reached. Padding is applied to the end of the tensor.
 
-    :param x:
-    :param max_length:
-    :return:
+    :param x: A tensor of arbitrary shape with at least two dimensions. Padding will be
+        applied to the second dimension.
+    :param max_length: The desired maximum length along the second dimension.
+    :return: A tensor padded to the specified maximum length along the second dimension.
+    :rtype: torch.tensor
     """
     current_dim = x.size(1)
     if current_dim < max_length:
@@ -62,7 +71,11 @@ def pad_features(x: torch.tensor, max_length: int) -> torch.tensor:
 
 class MLflowOutputFormat(KVWriter):
     """
-    Dumps key/value pairs into MLflow's numeric format.
+    Manages writing key-value pairs as metrics to MLflow, with specific handling
+    for excluded keys and step tracking. This class inherits from `KVWriter` and
+    extends its functionality to integrate with the MLflow tracking framework.
+    It allows logging of scalar values to MLflow and ignores keys with specified
+    exclusions involving "mlflow".
     """
 
     def write(
@@ -71,7 +84,23 @@ class MLflowOutputFormat(KVWriter):
         key_excluded: Dict[str, Union[str, Tuple[str, ...]]],
         step: int = 0,
     ) -> None:
+        """
+        Logs metrics to MLflow, filtering out specific keys based on exclusions and conditions.
+        Exclusion check ensures that metrics associated with keys marked as excluded for "mlflow"
+        are skipped. Metrics are only logged if they are scalar types and not strings, ensuring
+        numeric metrics are processed correctly.
 
+        :param key_values: Dictionary of key-value pairs where the key is the metric name
+            and the value is the metric value that needs to be logged.
+            Expected values in the dictionary include scalar types (e.g., int, float) and strings.
+        :param key_excluded: Dictionary of exclusion criteria for metrics. The key relates
+            to the metric name, and the value defines exclusion rules for the corresponding
+            metric. For the context of this method, a value containing "mlflow" prevents
+            the logging of that metric.
+        :param step: An integer representing the step or epoch index timestamp associated
+            with the metrics being logged. Default value is set to 0.
+        :return: This method does not return any value.
+        """
         for (key, value), (_, excluded) in zip(
             sorted(key_values.items()), sorted(key_excluded.items())
         ):
