@@ -23,4 +23,5 @@ from .modeling.gnn import (
 from .modeling.random_forest import RandomForestTrainer
 from .plots import plot_hist
 from .rl.environments import TransactionGraphEnv, TransactionGraphEnvV2
-from .utils import MLflowOutputFormat, save_model, pad_features
+from .rl.airl import AirlTrainer, extract_trajectories, register_envs, make_venvs, calibrate
+from .utils import MLflowOutputFormat, save_model, pad_features, load_dataframes

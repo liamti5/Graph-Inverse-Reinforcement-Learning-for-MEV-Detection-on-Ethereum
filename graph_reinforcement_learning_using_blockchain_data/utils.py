@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from imitation.rewards import reward_nets
 from stable_baselines3.common import base_class
 from stable_baselines3.common.logger import KVWriter
+import pandas as pd
 
 
 def save_model(
@@ -111,3 +112,12 @@ class MLflowOutputFormat(KVWriter):
             if isinstance(value, np.ScalarType):
                 if not isinstance(value, str):
                     mlflow.log_metric(key, value, step)
+
+
+def load_dataframes(file_paths: list) -> pd.DataFrame:
+    dataframes_dict = {}
+    for path in file_paths:
+        key = str(path).split("/")[-1].split(".")[0]
+        dataframes_dict[key] = pd.read_csv(path)
+
+    return dataframes_dict

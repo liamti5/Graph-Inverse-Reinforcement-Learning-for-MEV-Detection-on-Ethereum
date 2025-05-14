@@ -104,23 +104,25 @@ class AirlTrainer:
 
         return self.trainer, self.reward_net, self.learner
 
-    def calibrate(self, validation_trajectories):
-        states, obs, next_states, dones = (
-            validation_trajectories.obs,
-            validation_trajectories.acts,
-            validation_trajectories.next_obs,
-            validation_trajectories.dones,
-        )
-        outs = self.reward_net(states, obs, next_states, dones)
-        mean, std = outs.mean(), outs.std()
-        target_mean, target_std = 0.0, 1.0
-        alpha = target_std / std
-        beta = target_mean - alpha * mean
-        return alpha, beta
+
+def calibrate(validation_trajectories, reward_net):
+    states, obs, next_states, dones = (
+        validation_trajectories.obs,
+        validation_trajectories.acts,
+        validation_trajectories.next_obs,
+        validation_trajectories.dones,
+    )
+
+    outs = reward_net.predict(states, obs, next_states, dones)
+    mean, std = outs.mean(), outs.std()
+    target_mean, target_std = 0.0, 1.0
+    alpha = target_std / std
+    beta = target_mean - alpha * mean
+    return alpha, beta
 
 
 def register_envs(
-        df_dict: dict[str, pd.DataFrame], device: torch.device = torch.device("mps")
+    df_dict: dict[str, pd.DataFrame], device: torch.device = torch.device("mps")
 ) -> None:
     for k, df in df_dict.items():
         id = f"gymnasium_env/TransactionGraphEnv_{k}_v2"
@@ -136,8 +138,13 @@ def make_venvs(df_dict: dict[str, pd.DataFrame]) -> dict[str, gym.Env]:
     venvs = {}
     for k, df in df_dict.items():
         env_id = f"gymnasium_env/TransactionGraphEnv_{k}_v2"
-        venv = make_vec_env(env_id, rng=np.random.default_rng(42), n_envs=1,
-                            post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], parallel=False)
+        venv = make_vec_env(
+            env_id,
+            rng=np.random.default_rng(42),
+            n_envs=1,
+            post_wrappers=[lambda env, _: RolloutInfoWrapper(env)],
+            parallel=False,
+        )
         VecCheckNan(venv, raise_exception=True)
         venv.reset()
         venvs[k] = venv
@@ -166,15 +173,6 @@ def extract_trajectories(dataframes: dict[str, pd.DataFrame]) -> dict[str, Trans
     return trajectories
 
 
-def load_dataframes(file_paths: list) -> pd.DataFrame:
-    dataframes_dict = {}
-    for path in file_paths:
-        key = str(path).split("/")[-1].split(".")[0]
-        dataframes_dict[key] = pd.read_csv(path)
-
-    return dataframes_dict
-
-
 def run_airl_pipeline(data_class: str, embeddings: str, experiment_name: str, kwargs: dict):
     logger.info("Reading data ...")
     file_paths_eth_data = [
@@ -188,7 +186,7 @@ def run_airl_pipeline(data_class: str, embeddings: str, experiment_name: str, kw
         lambda x: np.array(ast.literal_eval(x), dtype=np.float32)
     )
 
-    dataframes = load_dataframes(file_paths_eth_data)
+    dataframes = grl.load_dataframes(file_paths_eth_data)
 
     for k, df in dataframes.items():
         dataframes[k] = pd.merge(
@@ -203,7 +201,10 @@ def run_airl_pipeline(data_class: str, embeddings: str, experiment_name: str, kw
     venvs = make_venvs(dataframes)
 
     airl_trainer = AirlTrainer(
-        venvs[f"airl_{data_class}_train"], trajectories[f"airl_{data_class}_train"], torch.device("mps"), **kwargs
+        venvs[f"airl_{data_class}_train"],
+        trajectories[f"airl_{data_class}_train"],
+        torch.device("mps"),
+        **kwargs,
     )
     airl_trainer.train(experiment_name)
 
@@ -243,13 +244,13 @@ def main():
         "disc_opt_kwargs": {
             "lr": 0.001,
         },
-        "policy_kwargs": {"use_expln": True},  # Fixing an issue with NaNs
+        "policy_kwargs": {"use_expln": True},
         "total_timesteps": 3000 * 100,
         "gen_train_timesteps": 3000,  # N steps in the environment per one round
         "n_steps": 3000,
         "demo_minibatch_size": 60,  # N samples in minibatch for one discrim. update
         "demo_batch_size": 300 * 10,  # N samples in the batch of expert data (batch)
-        "n_disc_updates_per_round": 4  # N discriminator updates per one round
+        "n_disc_updates_per_round": 4,  # N discriminator updates per one round
     }
 
     run_airl_pipeline(args.data_class, args.embeddings, args.experiment_name, kwargs)
