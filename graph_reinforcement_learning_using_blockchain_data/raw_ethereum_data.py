@@ -173,7 +173,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_class",
-        choices=["recipts0", "receipts1", "eth_balances0", "eth_balances1"],
+        choices=["receipts0", "receipts1", "eth_balances0", "eth_balances1"],
         default=None,
     )
     args0 = parser.parse_args()
