@@ -149,7 +149,7 @@ class TransactionGraphEnvV2(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.account_index = config.RNG.integers(0, len(self.accounts))
+        self.account_index = self.np_random.integers(0, len(self.accounts))
         self.transaction_index = 0
         self.current_trajectory = []
         self.current_account_transactions = self.df[
