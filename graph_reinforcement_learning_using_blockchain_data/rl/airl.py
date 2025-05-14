@@ -136,7 +136,7 @@ def make_venvs(df_dict: dict[str, pd.DataFrame]) -> dict[str, gym.Env]:
     venvs = {}
     for k, df in df_dict.items():
         env_id = f"gymnasium_env/TransactionGraphEnv_{k}_v2"
-        venv = make_vec_env(env_id, rng=np.random.default_rng(41), n_envs=1,
+        venv = make_vec_env(env_id, rng=np.random.default_rng(42), n_envs=1,
                             post_wrappers=[lambda env, _: RolloutInfoWrapper(env)], parallel=False)
         VecCheckNan(venv, raise_exception=True)
         venv.reset()
