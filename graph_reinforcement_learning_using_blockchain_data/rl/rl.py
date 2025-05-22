@@ -1,7 +1,7 @@
 import os
 import sys
 from typing import Dict, Any, Union, Tuple
-
+from deprecated import deprecated
 import gymnasium as gym
 import mlflow
 import numpy as np
@@ -24,6 +24,7 @@ loggers = Logger(
 )
 
 
+@deprecated(reason="This env was only used for initial exploration.")
 class BlockchainEnv(gym.Env):
     def __init__(
         self,
@@ -193,6 +194,7 @@ class BlockchainEnv(gym.Env):
 #         return actions, log_probs, entropy, values
 
 
+@deprecated(reason="This env was only used for initial exploration.")
 def run(
     vec_train_env,
     vec_test_env,
@@ -237,6 +239,7 @@ def run(
         os.remove(model_path)
 
 
+@deprecated(reason="This env was only used for initial exploration.")
 def test(vec_test_env, agent):
     total_correct = 0
     total_predictions = 0
@@ -257,6 +260,7 @@ def test(vec_test_env, agent):
     return accuracy
 
 
+@deprecated(reason="This env was only used for initial exploration.")
 def main():
     df = pd.read_csv(config.FLASHBOTS_Q2_DATA_DIR / "features_edges_multiocc.csv")
     max_addresses = df.groupby("blockNumber")["from"].nunique().max()
