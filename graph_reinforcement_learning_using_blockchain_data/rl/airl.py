@@ -122,15 +122,24 @@ def calibrate(validation_trajectories, reward_net):
 
 
 def register_envs(
-    df_dict: dict[str, pd.DataFrame], device: torch.device = torch.device("mps")
+    df_dict: dict[str, pd.DataFrame],
+    mflow_gnn_path,
+    label,
+    device: torch.device = torch.device("mps"),
 ) -> None:
     for k, df in df_dict.items():
         id = f"gymnasium_env/TransactionGraphEnv_{k}_v2"
         gym.envs.register(
             id=id,
             entry_point=grl.TransactionGraphEnvV2,
-            kwargs={"df": df, "alpha": 0.9, "device": device, "label": 0},
-            max_episode_steps=300,
+            kwargs={
+                "df": df,
+                "alpha": 0.9,
+                "device": device,
+                "label": int(label),
+                "model_uri": mflow_gnn_path,
+                "observation_space_dim": 128,
+            },
         )
 
 
@@ -173,7 +182,9 @@ def extract_trajectories(dataframes: dict[str, pd.DataFrame]) -> dict[str, Trans
     return trajectories
 
 
-def run_airl_pipeline(data_class: str, embeddings: str, experiment_name: str, kwargs: dict):
+def run_airl_pipeline(
+    data_class: str, embeddings: str, experiment_name: str, mlflow_gnn_path, kwargs: dict
+):
     logger.info("Reading data ...")
     file_paths_eth_data = [
         config.PROCESSED_DATA_DIR / "AIRL" / f"airl_{data_class}_train.csv",
@@ -196,7 +207,7 @@ def run_airl_pipeline(data_class: str, embeddings: str, experiment_name: str, kw
 
     trajectories = extract_trajectories(dataframes)
 
-    register_envs(dataframes)
+    register_envs(dataframes, mlflow_gnn_path, data_class)
 
     venvs = make_venvs(dataframes)
 
@@ -218,42 +229,50 @@ def main():
         "--embeddings",
     )
     parser.add_argument("--experiment_name")
+    parser.add_argument("--mlflow_gnn_path")
 
     args = parser.parse_args()
     assert args.data_class, "Please specify the data class."
     assert args.embeddings, "Please specify the embeddings file to use."
-    assert args.embeddings, "Please specify the experiment name."
+    assert args.experiment_name, "Please specify the experiment name."
+    assert args.mlflow_gnn_path, "Please specify the mlflow path to the gnn model."
 
     kwargs = {
-        "learning_rate": 0.001,  # Learning rate can be a function of progress
-        "batch_size": 60,  # Mini batch size for each gradient update
-        "n_epochs": 15,  # N of epochs when optimizing the surrogate loss
-        "gamma": 0.5,  # Discount factor, focus on the recent rewards
-        "gae_lambda": 0,  # Generalized advantage estimation
-        "clip_range": 0.1,  # Clipping parameter
-        "ent_coef": 0.01,  # Entropy coefficient for the loss calculation
+        # PPO hyper-params
+        "learning_rate": lambda frac: 1e-3 * frac,  # Learning rate can be a function of progress
+        "batch_size": 256,  # Mini batch size for each gradient update
+        "n_epochs": 10,  # N of epochs when optimizing the surrogate loss
+        "gamma": 0.95,  # Discount factor
+        "gae_lambda": 0.9,  # Generalized advantage estimation
+        "clip_range": 0.2,  # Clipping parameter
+        "ent_coef": 0.005,  # Entropy coefficient for the loss calculation
         "vf_coef": 0.5,  # Value function coef. for the loss calculation
         "max_grad_norm": 0.5,  # The maximum value for the gradient clipping
         "verbose": 0,  # Verbosity level: 0 no output, 1 info, 2 debug
         "normalize_advantage": True,  # Whether to normalize or not the advantage
-        "clip_range_vf": None,  # Clip for the value function
         "use_sde": False,  # Use State Dependent Exploration
         "sde_sample_freq": -1,  # SDE - noise matrix frequency (-1 = disable)
-        "gen_replay_buffer_capacity": None,
-        "allow_variable_horizon": True,
-        "disc_opt_kwargs": {
-            "lr": 0.001,
-        },
         "policy_kwargs": {"use_expln": True},
-        "total_timesteps": 3000 * 100,
-        "gen_train_timesteps": 3000,  # N steps in the environment per one round
-        "n_steps": 3000,
-        "demo_minibatch_size": 60,  # N samples in minibatch for one discrim. update
-        "demo_batch_size": 300 * 10,  # N samples in the batch of expert data (batch)
-        "n_disc_updates_per_round": 4,  # N discriminator updates per one round
+        # PPO roll-out length
+        "gen_train_timesteps": 2048,  # N steps in the environment per one round
+        "n_steps": 2048,
+        # AIRL discriminator
+        "n_disc_updates_per_round": 6,  # N discriminator updates per one round
+        "disc_opt_kwargs": {
+            "lr": 1e-3,
+            "weight_decay": 1e-4,
+        },
+        "demo_minibatch_size": 128,  # N samples in minibatch for one discrim. update
+        "demo_batch_size": 640,  # N samples in the batch of expert data (batch)
+        "allow_variable_horizon": True,
+        "gen_replay_buffer_capacity": None,
+        # total training
+        "total_timesteps": 2048 * 200,
     }
 
-    run_airl_pipeline(args.data_class, args.embeddings, args.experiment_name, kwargs)
+    run_airl_pipeline(
+        args.data_class, args.embeddings, args.experiment_name, args.mlflow_gnn_path, kwargs
+    )
 
 
 if __name__ == "__main__":

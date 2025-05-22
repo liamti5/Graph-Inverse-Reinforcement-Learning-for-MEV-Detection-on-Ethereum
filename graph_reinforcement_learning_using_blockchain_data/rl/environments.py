@@ -1,3 +1,5 @@
+from deprecated import deprecated
+
 import gymnasium as gym
 import mlflow
 import numpy as np
@@ -5,6 +7,7 @@ import pandas as pd
 import torch
 from torch_geometric.data import Batch
 from torch_geometric.nn import global_mean_pool
+from torch_geometric.nn.models import DeepGraphInfomax
 import requests
 
 import graph_reinforcement_learning_using_blockchain_data as grl
@@ -14,6 +17,7 @@ config.load_dotenv()
 mlflow.set_tracking_uri(uri=config.MLFLOW_TRACKING_URI)
 
 
+@deprecated(reason="Use TransactionGraphEnvV2 instead.")
 class TransactionGraphEnv(gym.Env):
     def __init__(
         self,
@@ -111,10 +115,9 @@ class TransactionGraphEnvV2(gym.Env):
         df: pd.DataFrame,
         alpha: float,
         label: int,
+        model_uri: str,
+        observation_space_dim: int,
         device: torch.device = torch.device("cpu"),
-        model_uri: str = "mlflow-artifacts:/748752183556303764/465d6f94d00b4fe2bef4d8885ed7be39/artifacts/model",
-        observation_space_dim: int = 128,
-        case: str = "supervised",
     ):
         try:
             response = requests.get(config.MLFLOW_TRACKING_URI, timeout=3)
@@ -124,9 +127,15 @@ class TransactionGraphEnvV2(gym.Env):
                 f"Could not connect to the MLflow tracking server at {config.MLFLOW_TRACKING_URI}. Have you started it? Original error: {e}"
             )
         model_uri = model_uri
-        self.case = case
         model = mlflow.pytorch.load_model(model_uri)
-        self.gnn = model if self.case == "supervised" else model.encoder
+
+        if isinstance(model, DeepGraphInfomax):
+            self.gnn = model.encoder
+            self.case = "unsupervised"
+        else:
+            self.gnn = model
+            self.case = "supervised"
+
         self.device = device
         self.gnn.to(device)
         self.label = label
@@ -158,10 +167,17 @@ class TransactionGraphEnvV2(gym.Env):
         self.current_account_transactions = self.current_account_transactions.sort_values(
             by=["blockNumber"]
         )
-        return self._get_observation(), {}
+        return self._obs(), {}
 
     def _obs(self):
-        start_idx = max(0, self.transaction_index - 1 - self.window_size)
+        if self.transaction_index == 0:
+            initial_obs = self.current_account_transactions.iloc[0]["embeddings"]
+            return np.array(initial_obs, dtype=np.float32)
+
+        if self.transaction_index >= len(self.current_account_transactions):
+            return np.zeros(self.observation_space.shape, dtype=np.float32)
+
+        start_idx = max(0, self.transaction_index - self.window_size)
         current_trxs = self.current_account_transactions.iloc[
             start_idx : self.transaction_index
         ].copy()
@@ -180,35 +196,39 @@ class TransactionGraphEnvV2(gym.Env):
 
         return embeddings.cpu().detach().numpy().squeeze(0)
 
-    def _get_observation(self, action=None):
-        if self.transaction_index == 0 or action is None:
-            initial_obs = self.current_account_transactions.iloc[0]["embeddings"]
-            return np.array(initial_obs, dtype=np.float32)
-
-        if self.transaction_index >= len(self.current_account_transactions):
-            return np.zeros(self.observation_space.shape, dtype=np.float32)
-
-        previous_trx = self.current_account_transactions.iloc[self.transaction_index - 1].copy()
+    def step(self, action: int):
         current_trx = self.current_account_transactions.iloc[self.transaction_index].copy()
-        actual_action = current_trx["action"]
+        previous_trx = (
+            self.current_account_transactions.iloc[self.transaction_index - 1].copy()
+            if self.transaction_index > 0
+            else current_trx
+        )
 
-        if action != actual_action:
+        expert_action = current_trx["action"]
+        # reward isn't used in AIRL training, but useful for later evaluation of learner
+        reward = 1.0 if action == expert_action else 0.0
+
+        if previous_trx["eth_balance"] <= 0:
+            previous_trx["eth_balance"] = current_trx["eth_balance"]
+
+        if action != expert_action:
             current_trx["action"] = action
+            # priority gas fee, so we add a std to the median gas price
             if action == 1:
                 current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx[
                     "gasUsed"
                 ] * (current_trx["median_gas_price"] + current_trx["std_gas_price"])
 
             else:
+                # low gas fee, so we subtract a std to the median gas price
                 current_trx["eth_balance"] = previous_trx["eth_balance"] - current_trx[
                     "gasUsed"
                 ] * (current_trx["median_gas_price"] - current_trx["std_gas_price"])
+
             self.current_account_transactions.iloc[self.transaction_index] = current_trx
 
-            obs = self._obs()
-
         else:
-            current_trx["action"] = action
+            # learner got the correct action, but we still have to recalculate eth balance since we don't know what happened in previous transitions. However, we just use the effective gas price
             current_trx["eth_balance"] = (
                 previous_trx["eth_balance"]
                 - current_trx["gasUsed"] * current_trx["effectiveGasPrice"]
@@ -216,30 +236,15 @@ class TransactionGraphEnvV2(gym.Env):
 
             self.current_account_transactions.iloc[self.transaction_index] = current_trx
 
-            obs = self._obs()
-
-        return obs
-
-    def step(self, action):
-        obs = self._get_observation(action)
-
-        # If this is the first transaction, there's no previous action to compare.
-        if self.transaction_index == 0:
-            reward = 0
-        else:
-            previous_trx = self.current_account_transactions.iloc[self.transaction_index - 1]
-            actual_action = previous_trx["action"]
-            reward = 1.0 if action == actual_action else 0.0
-
-        self.current_trajectory.append((obs, action))
         self.transaction_index += 1
+        next_obs = self._obs()
+        self.current_trajectory.append((next_obs, action))
 
-        done = False
+        # if we've exhausted all transactions for an account, we can signal done to trigger an env reset
+        done = self.transaction_index >= len(self.current_account_transactions)
         info = {}
         # check if we are done with this account
-        if self.transaction_index >= len(self.current_account_transactions):
-            done = True
-
+        if done:
             # metadata
             last_trx = self.current_account_transactions.iloc[self.transaction_index - 1]
             info = {
@@ -249,18 +254,6 @@ class TransactionGraphEnvV2(gym.Env):
                 "trajectory": self.current_trajectory,
             }
 
-            # move to the next account
-            self.account_index += 1
-            self.transaction_index = 0
-            if self.account_index < len(self.accounts):
-                self.current_account_transactions = self.df[
-                    self.df["from"] == self.accounts[self.account_index]
-                ]
-                self.current_account_transactions = self.current_account_transactions.sort_values(
-                    by=["blockNumber"]
-                )
-            else:
-                done = True
+        truncated = False
 
-        next_obs = self._get_observation(action)
-        return next_obs, reward, done, False, info
+        return next_obs, reward, done, truncated, info
