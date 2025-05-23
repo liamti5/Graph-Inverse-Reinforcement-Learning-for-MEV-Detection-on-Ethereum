@@ -1,7 +1,8 @@
+from typing import List, Tuple
+
 import mlflow
 import pandas as pd
 import seaborn as sns
-import typer
 from matplotlib import pyplot as plt
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
@@ -16,19 +17,21 @@ from sklearn.metrics import (
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
 from graph_reinforcement_learning_using_blockchain_data import config
 
 mlflow.set_tracking_uri(uri=config.MLFLOW_TRACKING_URI)
-
-from graph_reinforcement_learning_using_blockchain_data import config
-
 config.load_dotenv()
-
-app = typer.Typer()
 
 
 class RandomForestTrainer:
-    def grid_search(self, features_to_scale: list):
+    def grid_search(self, features_to_scale: List[str]) -> RandomizedSearchCV:
+        """
+        Configures and returns a RandomizedSearchCV object for hyperparameter tuning.
+
+        :param features_to_scale: A list of column names to be scaled using StandardScaler.
+        :return: A RandomizedSearchCV object configured for the Random Forest pipeline.
+        """
         preprocessor = ColumnTransformer(
             transformers=[("scaler", StandardScaler(), features_to_scale)], remainder="passthrough"
         )
@@ -59,7 +62,26 @@ class RandomForestTrainer:
         )
         return randomized_search
 
-    def train(self, X_train, X_test, y_train, y_test, grid_search, experiment_name):
+    def train(
+        self,
+        X_train: pd.DataFrame,
+        X_test: pd.DataFrame,
+        y_train: pd.Series,
+        y_test: pd.Series,
+        grid_search: RandomizedSearchCV,
+        experiment_name: str,
+    ) -> RandomizedSearchCV:
+        """
+        Trains the model using the provided data and grid search configuration, logging results to MLflow.
+
+        :param X_train: Training features.
+        :param X_test: Testing features.
+        :param y_train: Training target variable.
+        :param y_test: Testing target variable.
+        :param grid_search: The RandomizedSearchCV object to be used for training.
+        :param experiment_name: The name of the MLflow experiment.
+        :return: The best model found by the grid search.
+        """
         mlflow.sklearn.autolog()
         mlflow.set_experiment(experiment_name)
         with mlflow.start_run():
@@ -92,7 +114,16 @@ class RandomForestTrainer:
 
         return best_model
 
-    def test_metrics(self, y_test, y_test_pred):
+    def test_metrics(
+        self, y_test: pd.Series, y_test_pred: pd.Series
+    ) -> Tuple[float, float, float, float]:
+        """
+        Calculates and returns various classification metrics.
+
+        :param y_test: True labels.
+        :param y_test_pred: Predicted labels.
+        :return: A tuple containing accuracy, precision, recall, and F1-score.
+        """
         test_accuracy = accuracy_score(y_test, y_test_pred)
         test_precision = precision_score(y_test, y_test_pred)
         test_recall = recall_score(y_test, y_test_pred)
@@ -100,16 +131,14 @@ class RandomForestTrainer:
 
         return test_accuracy, test_precision, test_recall, test_f1
 
-    def classification_report(self, y_test, y_test_pred):
+    def classification_report(self, y_test: pd.Series, y_test_pred: pd.Series) -> pd.DataFrame:
+        """
+        Generates a classification report and returns it as a pandas DataFrame.
+
+        :param y_test: True labels.
+        :param y_test_pred: Predicted labels.
+        :return: A pandas DataFrame containing the classification report.
+        """
         report = classification_report(y_test, y_test_pred, output_dict=True)
         report_df = pd.DataFrame(report).transpose()
         return report_df
-
-
-@app.command()
-def main():
-    print("main not implemented")
-
-
-if __name__ == "__main__":
-    app()
