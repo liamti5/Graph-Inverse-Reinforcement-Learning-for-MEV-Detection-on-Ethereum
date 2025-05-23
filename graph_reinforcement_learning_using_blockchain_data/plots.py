@@ -7,16 +7,15 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 import pandas as pd
 
-from graph_reinforcement_learning_using_blockchain_data.config import (
-    FIGURES_DIR,
-    PROCESSED_DATA_DIR,
-)
 
-app = typer.Typer()
+def plot_hist(df: pd.DataFrame, label_name: str) -> None:
+    """
+    Generates and displays a histogram of class labels from a DataFrame.
 
-
-def plot_hist(df, label_name):
+    :param df: The input DataFrame containing the data.
+    :param label_name: The name of the column in the DataFrame that contains the class labels.
     sns.set(style="whitegrid")
+    """
 
     plt.figure(figsize=(8, 6))
     ax = sns.histplot(df[label_name], bins=2, discrete=True)
@@ -37,23 +36,3 @@ def plot_hist(df, label_name):
     ax.set_title("Histogram of Class Labels")
 
     plt.show()
-
-
-@app.command()
-def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    output_path: Path = FIGURES_DIR / "plot.png",
-    # -----------------------------------------
-):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Generating plot from data...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Plot generation complete.")
-    # -----------------------------------------
-
-
-if __name__ == "__main__":
-    app()

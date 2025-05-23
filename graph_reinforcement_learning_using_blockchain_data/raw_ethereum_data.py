@@ -3,6 +3,7 @@ import asyncio
 import os
 import random
 from argparse import ArgumentError
+from typing import List, Coroutine, Any, Dict
 
 import dask.dataframe as dd
 import pandas as pd
@@ -11,6 +12,7 @@ from loguru import logger
 from tenacity import retry, wait_exponential, stop_after_attempt
 from tqdm import tqdm
 from web3 import AsyncWeb3, AsyncHTTPProvider
+from web3.types import TxReceipt
 
 from graph_reinforcement_learning_using_blockchain_data.config import (
     EXTERNAL_DATA_DIR,
@@ -22,7 +24,15 @@ ALCHEMY_API_URL = os.getenv("ALCHEMY_API_URL")
 random.seed(42)
 
 
-async def gather_with_tqdm(coros, desc="Fetching logs"):
+async def gather_with_tqdm(coros: List[Coroutine], desc: str = "Fetching logs") -> List[Any]:
+    """
+    Execute coroutines concurrently with a progress bar.
+
+    :param coros: List of coroutines to execute concurrently
+    :param desc: Description for the progress bar
+    :return: List of results from the coroutines in the same order
+    """
+
     async def task_wrapper(coro, pbar):
         result = await coro
         pbar.update(1)
@@ -35,11 +45,30 @@ async def gather_with_tqdm(coros, desc="Fetching logs"):
 
 
 class Dataset:
+    """
+    Class for retrieving Ethereum blockchain data via a Web3 provider.
+
+    Provides methods to fetch transaction receipts, ETH balances, and transactions per block.
+    Uses asyncio and semaphores to manage concurrent API requests.
+    """
+
     def __init__(self):
+        """
+        Initialize a Dataset instance with Web3 provider and request rate limiter.
+        """
         self.web3 = AsyncWeb3(AsyncHTTPProvider(ALCHEMY_API_URL))
         self.sem = asyncio.Semaphore(5)
 
-    def fetch_eth_balances(self, accounts: list, block_numbers: list) -> list:
+    def fetch_eth_balances(
+        self, accounts: List[str], block_numbers: List[int]
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch ETH balances for multiple accounts at specified block numbers.
+
+        :param accounts: List of Ethereum account addresses
+        :param block_numbers: List of block numbers corresponding to each account
+        :return: List of dictionaries containing account, block_number, and balance
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         balances_list = loop.run_until_complete(
@@ -48,12 +77,12 @@ class Dataset:
         loop.close()
         return balances_list
 
-    def fetch_logs_per_transaction(self, trxs: list) -> dd.DataFrame:
+    def fetch_logs_per_transaction(self, trxs: List[str]) -> List[TxReceipt]:
         """
-        args:
-            trxs: list of transaction hashes to fetch logs for
-        returns:
-            list of logs for each transaction
+        Fetch transaction receipts for a list of transaction hashes.
+
+        :param trxs: List of transaction hashes to fetch receipts for
+        :return: List of transaction receipts (TxReceipt objects)
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -64,7 +93,13 @@ class Dataset:
 
         return results
 
-    def fetch_transactions_per_block(self, block_number: int) -> list:
+    def fetch_transactions_per_block(self, block_number: int) -> List[str]:
+        """
+        Fetch all transaction hashes in a specific block.
+
+        :param block_number: The block number to fetch transactions from
+        :return: List of transaction hashes in hexadecimal format
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         block = loop.run_until_complete(self.web3.eth.get_block(block_number))
@@ -73,7 +108,14 @@ class Dataset:
         return [trx.hex() for trx in trxs]
 
     @retry(wait=wait_exponential(min=1, max=60), stop=stop_after_attempt(5))
-    async def _get_logs(self, tx_hash: str) -> list:
+    async def _get_logs(self, tx_hash: str) -> TxReceipt:
+        """
+        Get transaction receipt for a transaction hash with retry logic.
+
+        :param tx_hash: Transaction hash to fetch receipt for
+        :return: Transaction receipt object
+        :raises: ClientResponseError if the request fails after retries
+        """
         async with self.sem:
             try:
                 receipt = await self.web3.eth.get_transaction_receipt(tx_hash)
@@ -83,13 +125,30 @@ class Dataset:
                     raise
                 raise
 
-    async def _fetch_eth_balances_async(self, accounts: list, block_numbers: list) -> list:
+    async def _fetch_eth_balances_async(
+        self, accounts: List[str], block_numbers: List[int]
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch ETH balances for multiple accounts asynchronously.
+
+        :param accounts: List of Ethereum account addresses
+        :param block_numbers: List of block numbers corresponding to each account
+        :return: List of dictionaries containing account, block_number, and balance
+        """
         unique_pairs = list({(acc, bn) for acc, bn in zip(accounts, block_numbers)})
         tasks = [self._get_eth_balance(acc, bn) for acc, bn in unique_pairs]
         return await gather_with_tqdm(tasks, desc="Fetching ETH balances")
 
     @retry(wait=wait_exponential(min=1, max=60), stop=stop_after_attempt(5))
-    async def _get_eth_balance(self, account: str, block_number: int) -> dict:
+    async def _get_eth_balance(self, account: str, block_number: int) -> Dict[str, Any]:
+        """
+        Get ETH balance for a specific account at a specific block with retry logic.
+
+        :param account: Ethereum account address
+        :param block_number: Block number to fetch balance at
+        :return: Dictionary containing account, block_number, and balance
+        :raises: ClientResponseError if the request fails after retries
+        """
         async with self.sem:
             try:
                 balance = await self.web3.eth.get_balance(account, block_identifier=block_number)
@@ -101,6 +160,13 @@ class Dataset:
 
 
 def _subsample(ddf: dd.DataFrame, rows: int) -> dd.DataFrame:
+    """
+    Subsample a Dask DataFrame to a specified number of rows.
+
+    :param ddf: Dask DataFrame to subsample
+    :param rows: Number of rows to sample (-1 to keep all rows)
+    :return: Subsampled Dask DataFrame
+    """
     if rows == -1:
         return ddf
     ddf.sort_values(by="block_number", inplace=True)
@@ -109,7 +175,18 @@ def _subsample(ddf: dd.DataFrame, rows: int) -> dd.DataFrame:
     return ddf
 
 
-def _get_data_class_0(ds: Dataset, rows: int, filename: str):
+def _get_data_class_0(ds: Dataset, rows: int, filename: str) -> None:
+    """
+    Process and save class 0 data (non-arbitrage transactions).
+
+    Samples normal transactions from the same blocks where arbitrage transactions
+    occurred, excluding the arbitrage transactions themselves.
+
+    :param ds: Dataset instance for fetching blockchain data
+    :param rows: Number of rows to subsample from the arbitrage dataset (-1 for all)
+    :param filename: Output filename for the processed data
+    :return: None
+    """
     ddf = dd.read_csv(
         EXTERNAL_DATA_DIR / "flashbots" / "Q2_2023" / "arbitrages.csv",
         dtype={
@@ -143,7 +220,17 @@ def _get_data_class_0(ds: Dataset, rows: int, filename: str):
     df_class_0.to_csv(PROCESSED_DATA_DIR / "flashbots" / "Q2_2023" / filename, index=False)
 
 
-def _get_data_class_1(ds: Dataset, rows: int, filename: str):
+def _get_data_class_1(ds: Dataset, rows: int, filename: str) -> None:
+    """
+    Process and save class 1 data (arbitrage transactions).
+
+    Fetches transaction receipts for arbitrage transactions from the flashbots dataset.
+
+    :param ds: Dataset instance for fetching blockchain data
+    :param rows: Number of rows to subsample from the arbitrage dataset (-1 for all)
+    :param filename: Output filename for the processed data
+    :return: None
+    """
     ddf = dd.read_csv(
         EXTERNAL_DATA_DIR / "flashbots" / "Q2_2023" / "arbitrages.csv",
         dtype={
@@ -163,13 +250,33 @@ def _get_data_class_1(ds: Dataset, rows: int, filename: str):
 
 
 def _get_eth_balances(ds: Dataset, input_file: str, output_file: str) -> None:
+    """
+    Fetch and save ETH balances for accounts in a given file.
+
+    :param ds: Dataset instance for fetching blockchain data
+    :param input_file: Path to input CSV file containing account addresses and block numbers
+    :param output_file: Path to output CSV file to save ETH balances
+    :return: None
+    """
     df = pd.read_csv(RAW_DATA_DIR / input_file)
     eth_balances = ds.fetch_eth_balances(df["from"].tolist(), df["blockNumber"].tolist())
     df_balances = pd.DataFrame(eth_balances)
     df_balances.to_csv(RAW_DATA_DIR / output_file, index=False)
 
 
-def main():
+def main() -> None:
+    """
+    Main function to parse command line arguments and execute the appropriate data processing tasks.
+
+    Command line arguments:
+    - data_class: Type of data to process (receipts0, receipts1, eth_balances0, eth_balances1)
+    - rows: Number of rows to sample (-1 for all)
+    - output_filename: Name of the output file
+    - input_filename: Name of the input file (for ETH balance tasks)
+
+    :return: None
+    :raises ArgumentError: If invalid arguments are provided
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_class",
