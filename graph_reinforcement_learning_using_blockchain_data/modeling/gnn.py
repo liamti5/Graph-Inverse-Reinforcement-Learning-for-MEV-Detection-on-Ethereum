@@ -20,7 +20,19 @@ app = typer.Typer()
 
 
 class GraphSAGE(nn.Module):
+    """
+    GraphSAGE model for graph classification.
+    """
+
     def __init__(self, num_node_features: int, hidden_channels: int, num_classes: int) -> None:
+        """
+        Initializes the GraphSAGE model.
+
+        :param num_node_features: The number of features for each node.
+        :param hidden_channels: The number of hidden channels in the SAGEConv layers.
+        :param num_classes: The number of output classes for classification.
+        :return: None
+        """
         torch.manual_seed(42)
         super(GraphSAGE, self).__init__()
         self.conv1 = SAGEConv(num_node_features, hidden_channels)
@@ -33,6 +45,14 @@ class GraphSAGE(nn.Module):
     def forward(
         self, data: Union[Data, Batch], return_embeddings: bool = False
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass of the GraphSAGE model.
+
+        :param data: The input graph data (either a single Data object or a Batch).
+        :param return_embeddings: If True, returns both the output and the embeddings.
+        :return: The output tensor, or a tuple of (output tensor, embedding tensor)
+                 if return_embeddings is True.
+        """
         # 1. embeddings
         x, edge_index = data.x, data.edge_index
         x = F.relu(self.conv1(x, edge_index))
@@ -53,7 +73,19 @@ class GraphSAGE(nn.Module):
 
 # DGI
 class SAGEEncoder(nn.Module):
+    """
+    SAGEEncoder module used within the Deep Graph Infomax (DGI) framework.
+    This encoder generates node embeddings.
+    """
+
     def __init__(self, num_node_features: int, hidden: int) -> None:
+        """
+        Initializes the SAGEEncoder.
+
+        :param num_node_features: The number of input features for each node.
+        :param hidden: The number of hidden units in the SAGEConv layers.
+        :return: None
+        """
         super().__init__()
         self.convs = nn.ModuleList(
             [
@@ -65,6 +97,12 @@ class SAGEEncoder(nn.Module):
         )
 
     def forward(self, data: Union[Data, Batch]) -> torch.Tensor:
+        """
+        Forward pass for the SAGEEncoder.
+
+        :param data: The input graph data (either a single Data object or a Batch).
+        :return: Node embeddings tensor of shape (num_nodes, hidden).
+        """
         x, edge_index = data.x, data.edge_index
         for conv in self.convs:
             x = F.relu(conv(x, edge_index))
@@ -72,7 +110,19 @@ class SAGEEncoder(nn.Module):
 
 
 class GraphSAGEClassifier(nn.Module):
+    """
+    A GraphSAGE based classifier that uses a pre-trained SAGEEncoder.
+    """
+
     def __init__(self, encoder: SAGEEncoder, hidden: int, num_classes: int) -> None:
+        """
+        Initializes the GraphSAGEClassifier.
+
+        :param encoder: A pre-trained SAGEEncoder instance.
+        :param hidden: The number of hidden units in the encoder's output (and input to the classifier).
+        :param num_classes: The number of output classes for classification.
+        :return: None
+        """
         super().__init__()
         self.encoder = encoder  # ← weights already trained
         self.fc1 = nn.Linear(hidden, 128)
@@ -81,6 +131,14 @@ class GraphSAGEClassifier(nn.Module):
     def forward(
         self, data: Union[Data, Batch], return_embeddings: bool = False
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass for the GraphSAGEClassifier.
+
+        :param data: The input graph data (either a single Data object or a Batch).
+        :param return_embeddings: If True, returns both the output and the embeddings.
+        :return: The output tensor, or a tuple of (output tensor, embedding tensor)
+                 if return_embeddings is True.
+        """
         x = self.encoder(data)
         x = global_mean_pool(x, data.batch, size=data.num_graphs)
         embeddings = self.fc1(x)
@@ -92,6 +150,15 @@ class GraphSAGEClassifier(nn.Module):
 def pretrain_dgi(
     loader: DataLoader, dgi: DeepGraphInfomax, device: torch.device, epochs: int = 10
 ) -> SAGEEncoder:
+    """
+    Pre-trains a SAGEEncoder using the Deep Graph Infomax (DGI) method.
+
+    :param loader: DataLoader for the training data.
+    :param dgi: The DeepGraphInfomax model instance.
+    :param device: The torch device (e.g., 'cuda' or 'cpu') to train on.
+    :param epochs: The number of epochs to train for.
+    :return: The pre-trained SAGEEncoder.
+    """
     mlflow.set_experiment("DGI")
     mlflow.pytorch.autolog()
     with mlflow.start_run():
@@ -122,6 +189,16 @@ def train(
     criterion: nn.Module,
     device: torch.device,
 ) -> float:
+    """
+    Trains the given model for one epoch.
+
+    :param model: The neural network model to train.
+    :param loader: DataLoader for the training data.
+    :param optimizer: The optimizer to use for training.
+    :param criterion: The loss function.
+    :param device: The torch device (e.g., 'cuda' or 'cpu') to train on.
+    :return: The average training loss for the epoch.
+    """
     model.train()
     total_loss = 0
     for data in loader:
@@ -144,6 +221,19 @@ def test(
     device: torch.device,
     return_embeddings: bool,
 ) -> Tuple[float, float, Dict[Any, torch.Tensor]]:
+    """
+    Evaluates the model on the test set.
+
+    :param model: The neural network model to test.
+    :param loader: DataLoader for the test data.
+    :param criterion: The loss function.
+    :param device: The torch device (e.g., 'cuda' or 'cpu') to test on.
+    :param return_embeddings: If True, computes and returns embeddings for the test data.
+    :return: A tuple containing:
+             - Average test loss.
+             - Test accuracy.
+             - A dictionary of embeddings if return_embeddings is True, otherwise an empty dictionary.
+    """
     model.eval()
     total_loss = 0
     correct = 0
@@ -188,22 +278,19 @@ def run_experiment(
     evaluates it on a test set, and logs metrics to MLflow. It supports returning node
     embeddings for downstream tasks.
 
-    Args:
-        experiment_name: Name for the MLflow experiment
-        num_epochs: Number of training epochs to run
-        model: Neural network model to train
-        train_loader: DataLoader containing the training dataset
-        test_loader: DataLoader containing the test dataset
-        optimizer: PyTorch optimizer for model training
-        criterion: Loss function for training
-        device: Torch device to use for computation (CPU/GPU)
-        return_embeddings: Whether to compute and return node embeddings
-
-    Returns:
-        A tuple containing:
-            - The trained model
-            - A dictionary mapping transaction IDs to their embeddings (if return_embeddings=True)
-              or an empty dictionary (if return_embeddings=False)
+    :param experiment_name: Name for the MLflow experiment.
+    :param num_epochs: Number of training epochs to run.
+    :param model: Neural network model to train.
+    :param train_loader: DataLoader containing the training dataset.
+    :param test_loader: DataLoader containing the test dataset.
+    :param optimizer: PyTorch optimizer for model training.
+    :param criterion: Loss function for training.
+    :param device: Torch device to use for computation (CPU/GPU).
+    :param return_embeddings: Whether to compute and return node embeddings.
+    :return: A tuple containing:
+             - The trained model.
+             - A dictionary mapping transaction IDs to their embeddings (if return_embeddings=True)
+               or an empty dictionary (if return_embeddings=False).
     """
     mlflow.set_experiment(experiment_name)
     mlflow.pytorch.autolog()
