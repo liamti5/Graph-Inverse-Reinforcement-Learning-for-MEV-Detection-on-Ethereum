@@ -1,7 +1,9 @@
 import ast
+from typing import List, Dict, Tuple, Any
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import torch
 import typer
 from torch_geometric.data import Data
@@ -10,10 +12,28 @@ app = typer.Typer()
 
 
 class Graph:
-    def __init__(self, graph: nx.Graph):
+    """
+    A wrapper class for a networkx.Graph object to compute various graph metrics.
+    """
+
+    def __init__(self, graph: nx.Graph) -> None:
+        """
+        Initializes the Graph object.
+
+        :param graph: A networkx.Graph object.
+        :return: None
+        """
         self.graph = graph
 
-    def compute_graph_metrics(self):
+    def compute_graph_metrics(self) -> Dict[str, Any]:
+        """
+        Computes various metrics for the graph.
+
+        Metrics include size, density, average degree, clustering coefficient,
+        largest component size, number of isolated nodes, and degree distribution.
+
+        :return: A dictionary containing the computed graph metrics.
+        """
         simple_G = nx.DiGraph(self.graph)
         density = nx.density(simple_G)
 
@@ -44,13 +64,31 @@ class Graph:
         }
 
 
-def _extract_transfer_addresses(topics):
+def _extract_transfer_addresses(topics: List[str]) -> Tuple[str, str]:
+    """
+    Extracts 'from' and 'to' addresses from ERC20 transfer event topics.
+
+    :param topics: A list of topic strings from an Ethereum log.
+                   Expected format: [signature, from_address_padded, to_address_padded, ...].
+    :return: A tuple containing the 'from' address and 'to' address (both as strings).
+    """
     from_address = "0x" + topics[1][-40:]
     to_address = "0x" + topics[2][-40:]
     return from_address, to_address
 
 
-def create_group_transaction_graph(group_df, label):
+def create_group_transaction_graph(group_df: pd.DataFrame, label: int) -> List[Data]:
+    """
+    Creates a list of graph Data objects from a group of transactions.
+
+    Each Data object represents the cumulative graph state after each transaction
+    in the group. Node features include degree and token balances.
+
+    :param group_df: A pandas DataFrame where each row represents a transaction
+                     and its associated logs and balances.
+    :param label: An integer label for the group of transactions (e.g., for classification).
+    :return: A list of torch_geometric.data.Data objects, each representing a graph snapshot.
+    """
     group_account_mapping = {}
     group_balances = {}
     node_counter = 0
