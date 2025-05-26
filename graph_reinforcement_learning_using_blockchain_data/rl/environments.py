@@ -38,7 +38,7 @@ class TransactionGraphEnvV2(gym.Env):
         Initializes the TransactionGraphEnvV2.
 
         :param df: DataFrame containing transaction data.
-        :param label: Label associated with the transaction data (1 for arbitrage, 0 for non-arbitrage).
+        :param label: Label associated with the transaction data (1 for arbitrage, 0 for non-arbitrage). Only required to satisfy the create_group_transaction_graph interface.
         :param model_uri: MLflow URI of the pre-trained GNN model.
         :param observation_space_dim: Dimensionality of the observation space.
         :param device: PyTorch device to use for model computations.

@@ -350,8 +350,8 @@ def main() -> None:
         "n_epochs": 10,  # N of epochs when optimizing the surrogate loss
         "gamma": 0.9,  # Discount factor
         "gae_lambda": 0.8,  # Generalized advantage estimation
-        "clip_range": 0.2,  # Clipping parameter
-        "ent_coef": 0.005,  # Entropy coefficient for the loss calculation
+        "clip_range": 0.25,  # Clipping parameter
+        "ent_coef": 0.03,  # Entropy coefficient for the loss calculation
         "vf_coef": 0.5,  # Value function coef. for the loss calculation
         "max_grad_norm": 0.5,  # The maximum value for the gradient clipping
         "verbose": 0,  # Verbosity level: 0 no output, 1 info, 2 debug
@@ -373,7 +373,7 @@ def main() -> None:
         "allow_variable_horizon": True,
         "gen_replay_buffer_capacity": None,
         # total training
-        "total_timesteps": 1024 * 200,
+        "total_timesteps": 2048 * 200,
     }
 
     kwargs_map = {
