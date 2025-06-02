@@ -174,3 +174,11 @@ cython_debug/
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/vcs.xml
+
+# data
+data/processed/flashbots/
+data/external/flashbots/Q1_2023
+data/external/flashbots/Q4_2022
+data/external/arbinet
+data/external/aws_public_blockchain_dataset
+
