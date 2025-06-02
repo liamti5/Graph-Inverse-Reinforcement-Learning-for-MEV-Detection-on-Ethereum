@@ -85,16 +85,16 @@ mlflow server --host 127.0.0.1 --port 8080
     ├── config.py            <- Stores configuration variables and paths
     ├── graphs.py            <- Functions for graph creation and manipulation
     ├── modeling             <- Contains code related to model training and architecture
-        ├── __init__.py      <- Makes modeling a Python submodule
-        ├── gnn.py           <- Graph Neural Network model implementations
-        └── random_forest.py <- Random Forest model implementations
+    │   ├── __init__.py      <- Makes modeling a Python submodule
+    │   ├── gnn.py           <- Graph Neural Network model implementations
+    │   └── random_forest.py <- Random Forest model implementations
     ├── plots.py             <- Functions for creating visualizations
     ├── raw_ethereum_data.py <- Scripts for fetching and processing raw Ethereum data
     ├── rl                   <- Contains code related to Reinforcement Learning
-        ├── __init__.py      <- Makes rl a Python submodule
-        ├── airl.py          <- Adversarial Inverse Reinforcement Learning implementations
-        ├── environments.py  <- Custom RL environment definitions
-        └── rl.py            <- General RL algorithm implementations and utilities
+    │   ├── __init__.py      <- Makes rl a Python submodule
+    │   ├── airl.py          <- Adversarial Inverse Reinforcement Learning implementations
+    │   ├── environments.py  <- Custom RL environment definitions
+    │   └── rl.py            <- General RL algorithm implementations and utilities
     └── utils.py             <- Utility functions used across the project
 ```
 
