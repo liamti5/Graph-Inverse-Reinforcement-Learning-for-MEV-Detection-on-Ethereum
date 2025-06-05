@@ -7,7 +7,14 @@
 [![Imitation](https://img.shields.io/badge/imitation-v1.0.1-brightgreen)](https://imitation.readthedocs.io/en/latest/)
 [![PyTorch Geometric](https://img.shields.io/pypi/v/torch-geometric?label=PyG&color=blue)](https://pytorch-geometric.readthedocs.io/en/latest/index.html)
 
-This repository contains the full implementation of a research framework developed for a master’s thesis at the [University of Zurich (UZH)](https://www.uzh.ch/en.html), conducted within the [Blockchain and Distributed Ledger Technologies (BDLT)](https://www.ifi.uzh.ch/en/bdlt/index.html) group. The project focuses on detecting MEV arbitrage transactions on the Ethereum blockchain by combining Graph Neural Networks (GNNs) with Adversarial Inverse Reinforcement Learning (AIRL). It includes baseline classifiers, GNN-based embedding models, and AIRL training pipelines that jointly learn reward functions and policies from transaction graph data. The code supports supervised, unsupervised, and hybrid learning setups, enabling both classification and policy inference. It is intended to support reproducible research in MEV detection, transaction classification, and reinforcement learning for blockchain analytics.
+This repository contains the full implementation of a research framework developed for a master’s thesis at 
+the [University of Zurich (UZH)](https://www.uzh.ch/en.html), conducted within the 
+[Blockchain and Distributed Ledger Technologies (BDLT)](https://www.ifi.uzh.ch/en/bdlt/index.html) group. 
+The project focuses on detecting MEV arbitrage transactions on the Ethereum blockchain by combining Graph Neural Networks (GNNs) 
+with Adversarial Inverse Reinforcement Learning (AIRL). It includes baseline classifiers, GNN-based embedding models, and AIRL training 
+pipelines that jointly learn reward functions and policies from transaction graph data. The code supports supervised, unsupervised, and 
+hybrid learning setups, enabling both classification and policy inference. It is intended to support reproducible research in MEV detection, 
+transaction classification, and reinforcement learning for blockchain analytics.
 
 ## Installation
 
@@ -40,9 +47,59 @@ Now you should have all the dependencies installed and are ready to run the proj
 
 ## ML-Flow
 To start the mlflow server, run 
-```
+```bash
 mlflow server --host 127.0.0.1 --port 8080
 ```
+then you can visit http://127.0.0.1:8080 to see all experiments. 
+
+## Usage
+
+### AIRL evaluation
+The main evaluation notebook for AIRL can be found in `notebooks/4.01-airl-evaluation.ipynb`. It contains the evaluation of all three 
+different AIRL models, including:
+- Classification performance metrics like accuracy and F1-score as well as confusion matrices on unseen trajectories.
+- Learner (PPO) performance with learned reward functions on unseen trajectories. 
+
+### AIRL training
+AIRL was trained using the `graph_reinfocement_learning_with_blockchain_data/rl/airl.py` script. It takes 4 arguments:
+1. `dataclass`: class 0 or one (non-arbitrage or arbitrage)
+2. `embeddings`: which embeddings dataframe to use (GraphSAGE, DGI, or semi-supervised GraphSAGE)
+3. `experiment_name`: name for ML-Flow
+4. `mlflow_gnn_path`: ML-Flow path to the GNN to use for state encoding
+
+Example usage:
+```bash
+poetry run python3 graph_reinforcement_learning_using_blockchain_data/rl/airl.py
+    --data_class 1 
+    --embeddings state_embeddings_pre_trained_128.csv 
+    --experiment_name "AIRLv2 DGI semi-supervised"  
+    --mlflow_gnn_path mlflow-artifacts:/330930495026013213/b4b2eb74d0e04aed97df2a607a451fa9/artifacts/model
+```
+
+### GNN training
+The GNNs were trained using the `graph_reinfocement_learning_with_blockchain_data/modeling/gnn.py` script. It contains definitions of:
+- GraphSAGE model
+- SAGEEncoder
+- GraphSAGEClassifier
+as well as helper functions for training. You can use the `run_experiment` function for training. 
+
+Example usage:
+```python
+gnn.run_experiment(
+    "Graph SAGE", 20, model_GNNSAGE, train_loader, test_loader, optimizer, criterion, device
+)
+```
+
+### Random Forest training
+The Random Forest (RF) models were trained using the `graph_reinfocement_learning_with_blockchain_data/modeling/random_forest.py` script. 
+
+Example usage:
+```python
+rf_trainer = random_forest.RandomForestTrainer()
+grid_search = rf_trainer.grid_search(features_to_scale)
+rf_trainer.train(X_train, X_test, y_train, y_test, grid_search, "Edge Classification")
+```
+
 
 ## Project Organization
 
