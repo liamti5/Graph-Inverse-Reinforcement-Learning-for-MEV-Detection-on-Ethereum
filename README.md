@@ -40,7 +40,7 @@ transaction classification, and reinforcement learning for blockchain analytics.
     poetry shell
     ```
     
-Now you should have all the dependencies installed and are ready to run the project.
+Now you should have all the dependencies installed and are ready to run files in this project.
 
 > [!IMPORTANT]  
 > ML-Flow is used for tracking experiments, models, and metrics. Make sure to start the ML-Flow server to load artifacts. See below.
@@ -62,10 +62,10 @@ different AIRL models, including:
 
 ### AIRL training
 AIRL was trained using the `graph_reinfocement_learning_with_blockchain_data/rl/airl.py` script. It takes 4 arguments:
-1. `dataclass`: class 0 or one (non-arbitrage or arbitrage)
-2. `embeddings`: which embeddings dataframe to use (GraphSAGE, DGI, or semi-supervised GraphSAGE)
-3. `experiment_name`: name for ML-Flow
-4. `mlflow_gnn_path`: ML-Flow path to the GNN to use for state encoding
+1. `--data_class`: class 0 or 1 (non-arbitrage or arbitrage)
+2. `--embeddings`: which embeddings dataframe to use (GraphSAGE, DGI, or semi-supervised GraphSAGE)
+3. `--experiment_name`: name for ML-Flow experiment
+4. `--mlflow_gnn_path`: ML-Flow path to the GNN to use for state encoding (used in `graph_reinfocement_learning_with_blockchain_data/rl/environments.py`)
 
 Example usage:
 ```bash
@@ -85,7 +85,9 @@ as well as helper functions for training. You can use the `run_experiment` funct
 
 Example usage:
 ```python
-gnn.run_experiment(
+import graph_reinforcement_learning_using_blockchain_data as grl
+
+grl.run_experiment(
     "Graph SAGE", 20, model_GNNSAGE, train_loader, test_loader, optimizer, criterion, device
 )
 ```
@@ -95,7 +97,9 @@ The Random Forest (RF) models were trained using the `graph_reinfocement_learnin
 
 Example usage:
 ```python
-rf_trainer = random_forest.RandomForestTrainer()
+import graph_reinforcement_learning_using_blockchain_data as grl
+
+rf_trainer = grl.RandomForestTrainer()
 grid_search = rf_trainer.grid_search(features_to_scale)
 rf_trainer.train(X_train, X_test, y_train, y_test, grid_search, "Edge Classification")
 ```
