@@ -46,6 +46,7 @@ Now you should have all the dependencies installed and are ready to run files in
 > ML-Flow is used for tracking experiments, models, and metrics. Make sure to start the ML-Flow server to load artifacts. See below.
 
 ## ML-Flow
+
 To start the mlflow server, run 
 ```bash
 mlflow server --host 127.0.0.1 --port 8080
@@ -55,12 +56,14 @@ then you can visit http://127.0.0.1:8080 to see all experiments.
 ## Usage
 
 ### AIRL evaluation
+
 The main evaluation notebook for AIRL can be found in `notebooks/4.01-airl-evaluation.ipynb`. It contains the evaluation of all three 
 different AIRL models, including:
-- Classification performance metrics like accuracy and F1-score as well as confusion matrices on unseen trajectories.
-- Learner (PPO) performance with learned reward functions on unseen trajectories. 
+- Classification performance metrics like accuracy and F1-score as well as confusion matrices on unseen trajectories
+- Learner (PPO) performance with learned reward functions on unseen trajectories
 
 ### AIRL training
+
 AIRL was trained using the `graph_reinfocement_learning_with_blockchain_data/rl/airl.py` script. It takes 4 arguments:
 1. `--data_class`: class 0 or 1 (non-arbitrage or arbitrage)
 2. `--embeddings`: which embeddings dataframe to use (GraphSAGE, DGI, or semi-supervised GraphSAGE)
@@ -69,14 +72,11 @@ AIRL was trained using the `graph_reinfocement_learning_with_blockchain_data/rl/
 
 Example usage:
 ```bash
-poetry run python3 graph_reinforcement_learning_using_blockchain_data/rl/airl.py
-    --data_class 1 
-    --embeddings state_embeddings_pre_trained_128.csv 
-    --experiment_name "AIRLv2 DGI semi-supervised"  
-    --mlflow_gnn_path mlflow-artifacts:/330930495026013213/b4b2eb74d0e04aed97df2a607a451fa9/artifacts/model
+poetry run python3 graph_reinforcement_learning_using_blockchain_data/rl/airl.py --data_class 1 --embeddings state_embeddings_pre_trained_128.csv --experiment_name "AIRLv2 DGI semi-supervised" --mlflow_gnn_path mlflow-artifacts:/132032870842317128/7559d28e50674e629ce8042ea64902de/artifacts/model 
 ```
 
 ### GNN training
+
 The GNNs were trained using the `graph_reinfocement_learning_with_blockchain_data/modeling/gnn.py` script. It contains definitions of:
 - GraphSAGE model
 - SAGEEncoder
@@ -93,6 +93,7 @@ grl.run_experiment(
 ```
 
 ### Random Forest training
+
 The Random Forest (RF) models were trained using the `graph_reinfocement_learning_with_blockchain_data/modeling/random_forest.py` script. 
 
 Example usage:
@@ -103,7 +104,32 @@ rf_trainer = grl.RandomForestTrainer()
 grid_search = rf_trainer.grid_search(features_to_scale)
 rf_trainer.train(X_train, X_test, y_train, y_test, grid_search, "Edge Classification")
 ```
+### Data
 
+The `graph_reinforcement_learning_using_blockchain_data/raw_ethereum_data.py` script is used to fetch and process raw Ethereum 
+blockchain data, such as transaction receipts and ETH balances. It requires an Alchemy API URL to be set as an environment 
+variable `ALCHEMY_API_URL`.
+
+The script accepts the following command-line arguments:
+-   `--data`: Specifies the type of data to process.
+    -   `receipts0`: Fetch transaction receipts for non-arbitrage transactions (class 0).
+    -   `receipts1`: Fetch transaction receipts for arbitrage transactions (class 1).
+    -   `eth_balances`: Fetch ETH balances for accounts that are present in a given CSV file.
+-   `--rows` (optional, for `receipts0`, `receipts1`): Number of rows to sample from the source arbitrage dataset. Defaults to -1 (all rows).
+-   `--output_filename`: Name of the output CSV file.
+-   `--input_filename` (optional, for `eth_balances`): Name of the input CSV file containing accounts and block numbers.
+
+Example usage:
+
+Fetching transaction receipts for class 0 (non-arbitrage):
+```bash
+poetry run python graph_reinforcement_learning_using_blockchain_data/raw_ethereum_data.py --data receipts0 --rows 1000 --output_filename sampled_receipts_class0.csv
+```
+
+Fetching ETH balances for accounts from `processed_receipts_class0.csv`:
+```bash
+poetry run python graph_reinforcement_learning_using_blockchain_data/raw_ethereum_data.py --data eth_balances --input_filename receipts_class0.csv --output_filename eth_balances_class0.csv
+```
 
 ## Project Organization
 
