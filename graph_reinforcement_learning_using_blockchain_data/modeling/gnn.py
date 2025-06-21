@@ -106,7 +106,7 @@ class SAGEEncoder(nn.Module):
         x, edge_index = data.x, data.edge_index
         for conv in self.convs:
             x = F.relu(conv(x, edge_index))
-        return x  # (num_nodes, hidden)
+        return x
 
 
 class GraphSAGEClassifier(nn.Module):
@@ -124,7 +124,7 @@ class GraphSAGEClassifier(nn.Module):
         :return: None
         """
         super().__init__()
-        self.encoder = encoder  # ← weights already trained
+        self.encoder = encoder
         self.fc1 = nn.Linear(hidden, 128)
         self.fc2 = nn.Linear(128, num_classes)
 

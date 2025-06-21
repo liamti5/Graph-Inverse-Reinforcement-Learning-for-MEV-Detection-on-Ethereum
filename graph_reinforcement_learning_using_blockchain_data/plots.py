@@ -1,11 +1,6 @@
-from pathlib import Path
-
-import typer
-from loguru import logger
-from tqdm import tqdm
+import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
-import pandas as pd
 
 
 def plot_hist(df: pd.DataFrame, label_name: str) -> None:

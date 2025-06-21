@@ -36,16 +36,12 @@ def save_model(
     :param ts: Timestamp to label the saved components
     :return: None
     """
-    # Create the directory if it does not exist
     os.makedirs(path, exist_ok=True)
 
-    # Save the learner
     learner.save(f"{path}/{ts}_learner")
 
-    # Save the reward net
     th.save(reward_net, f"{path}/{ts}_reward_nn")
 
-    # Save the training statistics
     with open(f"{path}/{ts}_stats.pkl", "wb") as f:
         pickle.dump(stats, f)
 

@@ -312,31 +312,31 @@ def main() -> None:
 
     kwargs_class1 = {
         # PPO hyper-params
-        "learning_rate": 2e-4,  # Learning rate can be a function of progress
-        "batch_size": 256,  # Mini batch size for each gradient update
-        "n_epochs": 10,  # N of epochs when optimizing the surrogate loss
-        "gamma": 0.99,  # Discount factor
-        "gae_lambda": 0.95,  # Generalized advantage estimation
-        "clip_range": 0.25,  # Clipping parameter
-        "ent_coef": 0.05,  # Entropy coefficient for the loss calculation
-        "vf_coef": 1.0,  # Value function coef. for the loss calculation
-        "max_grad_norm": 0.5,  # The maximum value for the gradient clipping
-        "verbose": 0,  # Verbosity level: 0 no output, 1 info, 2 debug
-        "normalize_advantage": False,  # Whether to normalize or not the advantage
-        "use_sde": False,  # Use State Dependent Exploration
-        "sde_sample_freq": -1,  # SDE - noise matrix frequency (-1 = disable)
+        "learning_rate": 2e-4,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "clip_range": 0.25,
+        "ent_coef": 0.05,
+        "vf_coef": 1.0,
+        "max_grad_norm": 0.5,
+        "verbose": 0,
+        "normalize_advantage": False,
+        "use_sde": False,
+        "sde_sample_freq": -1,
         "policy_kwargs": {"use_expln": True},
         # PPO roll-out length
-        "gen_train_timesteps": 2048,  # N steps in the environment per one round
+        "gen_train_timesteps": 2048,
         "n_steps": 2048,
         # AIRL discriminator
-        "n_disc_updates_per_round": 8,  # N discriminator updates per one round
+        "n_disc_updates_per_round": 8,
         "disc_opt_kwargs": {
             "lr": 1e-3,
             "weight_decay": 1e-4,
         },
-        "demo_minibatch_size": 128,  # N samples in minibatch for one discrim. update
-        "demo_batch_size": 640,  # N samples in the batch of expert data (batch)
+        "demo_minibatch_size": 128,
+        "demo_batch_size": 640,
         "allow_variable_horizon": True,
         "gen_replay_buffer_capacity": None,
         # total training
@@ -345,31 +345,31 @@ def main() -> None:
 
     kwargs_class0 = {
         # PPO hyper-params
-        "learning_rate": 5e-4,  # Learning rate can be a function of progress
-        "batch_size": 256,  # Mini batch size for each gradient update
-        "n_epochs": 10,  # N of epochs when optimizing the surrogate loss
-        "gamma": 0.9,  # Discount factor
-        "gae_lambda": 0.8,  # Generalized advantage estimation
-        "clip_range": 0.25,  # Clipping parameter
-        "ent_coef": 0.03,  # Entropy coefficient for the loss calculation
-        "vf_coef": 0.5,  # Value function coef. for the loss calculation
-        "max_grad_norm": 0.5,  # The maximum value for the gradient clipping
-        "verbose": 0,  # Verbosity level: 0 no output, 1 info, 2 debug
-        "normalize_advantage": True,  # Whether to normalize or not the advantage
-        "use_sde": False,  # Use State Dependent Exploration
-        "sde_sample_freq": -1,  # SDE - noise matrix frequency (-1 = disable)
+        "learning_rate": 5e-4,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "gamma": 0.9,
+        "gae_lambda": 0.8,
+        "clip_range": 0.25,
+        "ent_coef": 0.03,
+        "vf_coef": 0.5,
+        "max_grad_norm": 0.5,
+        "verbose": 0,
+        "normalize_advantage": True,
+        "use_sde": False,
+        "sde_sample_freq": -1,
         "policy_kwargs": {"use_expln": True},
         # PPO roll-out length
-        "gen_train_timesteps": 2048,  # N steps in the environment per one round
+        "gen_train_timesteps": 2048,
         "n_steps": 1024,
         # AIRL discriminator
-        "n_disc_updates_per_round": 6,  # N discriminator updates per one round
+        "n_disc_updates_per_round": 6,
         "disc_opt_kwargs": {
             "lr": 1e-3,
             "weight_decay": 1e-4,
         },
-        "demo_minibatch_size": 128,  # N samples in minibatch for one discrim. update
-        "demo_batch_size": 512,  # N samples in the batch of expert data (batch)
+        "demo_minibatch_size": 128,
+        "demo_batch_size": 512,
         "allow_variable_horizon": True,
         "gen_replay_buffer_capacity": None,
         # total training

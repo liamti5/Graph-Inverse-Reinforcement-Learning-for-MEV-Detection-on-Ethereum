@@ -1,4 +1,4 @@
-from graph_reinforcement_learning_using_blockchain_data import config  # noqa: F401
+from graph_reinforcement_learning_using_blockchain_data import config
 from .config import (
     DATA_DIR,
     PROCESSED_DATA_DIR,

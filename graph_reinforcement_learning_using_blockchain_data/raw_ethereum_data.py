@@ -269,7 +269,7 @@ def main() -> None:
     Main function to parse command line arguments and execute the appropriate data processing tasks.
 
     Command line arguments:
-    - data_class: Type of data to process (receipts0, receipts1, eth_balances0, eth_balances1)
+    - data: Type of data to process (receipts0, receipts1, eth_balances)
     - rows: Number of rows to sample (-1 for all)
     - output_filename: Name of the output file
     - input_filename: Name of the input file (for ETH balance tasks)
@@ -278,38 +278,33 @@ def main() -> None:
     :raises ArgumentError: If invalid arguments are provided
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data_class",
-        choices=["receipts0", "receipts1", "eth_balances0", "eth_balances1"],
-        default=None,
-    )
-    args0 = parser.parse_args()
-
-    match args0:
-        case "0" | "1":
-            parser.add_argument("--rows", default=-1, type=int)
-            parser.add_argument("--output_filename")
-        case "eth_balances0":
-            parser.add_argument("--input_filename", default="receipts_class0.csv")
-            parser.add_argument("--output_filename", default="eth_balances_class0.csv")
-        case "eth_balances1":
-            parser.add_argument("--input_filename", default="receipts_class1.csv")
-            parser.add_argument("--output_filename", default="eth_balances_class1.csv")
-        case _:
-            raise ArgumentError
+    parser.add_argument("--data", type=str, required=True)
+    parser.add_argument("--rows", type=int, default=-1)
+    parser.add_argument("--output_filename", type=str, required=True)
+    parser.add_argument("--input_filename", type=str)
 
     args = parser.parse_args()
-    assert args.data_class, "Please provide a data class to process"
+
+    if args.data not in ["receipts0", "receipts1", "eth_balances"]:
+        raise ArgumentError(
+            argument=None,
+            message="Invalid data class. Choose from: receipts0, receipts1, eth_balances.",
+        )
+
+    if args.data == "eth_balances" and not args.input_filename:
+        raise ArgumentError(
+            argument=None, message="Input filename is required for eth_balances data class."
+        )
 
     ds = Dataset()
 
     logger.info("Processing dataset...")
 
-    match args.data_class:
-        case "0":
-            _get_data_class_0(ds, int(args.rows), args.output_filename)
-        case "1":
-            _get_data_class_1(ds, int(args.rows), args.output_filename)
+    match args.data:
+        case "receipts0":
+            _get_data_class_0(ds, args.rows, args.output_filename)
+        case "receipts1":
+            _get_data_class_1(ds, args.rows, args.output_filename)
         case "eth_balances":
             logger.info(
                 f"Will get ETH balances for accounts in {args.input_filename} and save as {args.output_filename}"

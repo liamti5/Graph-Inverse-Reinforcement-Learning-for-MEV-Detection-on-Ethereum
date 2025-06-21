@@ -1,14 +1,14 @@
 import os
 import sys
-from typing import Dict, Any, Union, Tuple
-from deprecated import deprecated
+
 import gymnasium as gym
 import mlflow
 import numpy as np
 import pandas as pd
+from deprecated import deprecated
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.logger import HumanOutputFormat, KVWriter, Logger
+from stable_baselines3.common.logger import HumanOutputFormat, Logger
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -108,16 +108,13 @@ class BlockchainEnv(gym.Env):
     def step(self, action):
         num_active = len(self.current_active_addresses)
         valid_actions = action[:num_active]
-        # Compare agent's predictions with ground truth.
         rewards = (valid_actions == self.current_ground_truth).astype(np.float32)
         total_reward = float(np.sum(rewards))
 
-        # For addresses with a correct prediction, update their embedding.
         for i, addr in enumerate(self.current_active_addresses):
             if rewards[i] == 1:
-                agg_features = self._aggregate_features(addr)  # shape: (feature_dim,)
-                # Project the aggregated features into the embedding space.
-                # Here we use a fixed random projection.
+                agg_features = self._aggregate_features(addr)
+
                 if not hasattr(self, "proj"):
                     self.proj = np.random.randn(self.feature_dim, self.embedding_dim).astype(
                         np.float32
@@ -133,65 +130,6 @@ class BlockchainEnv(gym.Env):
         done = self.current_block_index >= len(self.blocks)
         obs = self._get_observation() if not done else None
         return obs, total_reward, done, False, {}
-
-
-# class PPOActor(nn.Module):
-#     def __init__(self, embedding_dim, hidden_dim=64, action_dim=2):
-#         super(PPOActor, self).__init__()
-#         self.fc1 = nn.Linear(embedding_dim, hidden_dim)
-#         self.fc2 = nn.Linear(hidden_dim, action_dim)
-#
-#     def forward(self, states):
-#         # states: shape (max_addresses, embedding_dim)
-#         x = F.relu(self.fc1(states))
-#         logits = self.fc2(x)  # shape: (max_addresses, action_dim)
-#         return logits
-#
-#
-# # Critic network to estimate state values.
-# class PPOCritic(nn.Module):
-#     def __init__(self, embedding_dim, hidden_dim=64):
-#         super(PPOCritic, self).__init__()
-#         self.fc1 = nn.Linear(embedding_dim, hidden_dim)
-#         self.fc2 = nn.Linear(hidden_dim, 1)
-#
-#     def forward(self, states):
-#         x = F.relu(self.fc1(states))
-#         values = self.fc2(x)  # shape: (max_addresses, 1)
-#         return values
-#
-#
-# # Combined PPO Agent that uses both the actor and the critic.
-# class PPOAgent(nn.Module):
-#     def __init__(self, embedding_dim, action_dim=2):
-#         super(PPOAgent, self).__init__()
-#         self.actor = PPOActor(embedding_dim, hidden_dim=64, action_dim=action_dim)
-#         self.critic = PPOCritic(embedding_dim, hidden_dim=64)
-#
-#     def act(self, observation):
-#         """
-#         observation: a dict with keys 'states' and 'mask'
-#         'states': numpy array of shape (max_addresses, embedding_dim)
-#         'mask': numpy array of shape (max_addresses,) indicating which rows are active.
-#         """
-#         states = torch.tensor(
-#             observation["states"], dtype=torch.float32
-#         )  # shape: (max_addresses, embedding_dim)
-#         mask = torch.tensor(observation["mask"], dtype=torch.float32)  # shape: (max_addresses,)
-#
-#         # Compute logits for each address.
-#         logits = self.actor(states)  # shape: (max_addresses, action_dim)
-#         action_probs = F.softmax(logits, dim=-1)  # probabilities for each address.
-#         dist = torch.distributions.Categorical(action_probs)
-#         actions = dist.sample()  # shape: (max_addresses,)
-#
-#         # Zero out actions for inactive addresses.
-#         actions = actions * mask.long()
-#         log_probs = dist.log_prob(actions)
-#         entropy = dist.entropy()
-#         # Critic returns state-value estimates for each address.
-#         values = self.critic(states)  # shape: (max_addresses, 1)
-#         return actions, log_probs, entropy, values
 
 
 @deprecated(reason="This env was only used for initial exploration.")
@@ -243,7 +181,7 @@ def run(
 def test(vec_test_env, agent):
     total_correct = 0
     total_predictions = 0
-    obs = vec_test_env.reset()  # vec_test_env.reset() returns only the observations
+    obs = vec_test_env.reset()
     print(obs)
     done = False
 
@@ -313,18 +251,15 @@ def main():
     check_env(train_env)
     check_env(test_env)
 
-    # Wrap your environment in a DummyVecEnv to make it compatible with SB3.
     vec_train_env = DummyVecEnv([lambda: train_env])
     vec_test_env = DummyVecEnv([lambda: test_env])
 
-    # Set up MLflow experiment.
     mlflow.set_experiment("RL PPO soft-update embeddings v1")
     n_steps = 2048
     batch_size = 256
     total_timesteps = len(train_blocks) * 5
 
     with mlflow.start_run():
-        # Log parameters.
         mlflow.log_param("max_num_addresses", max_num_addresses)
         mlflow.log_param("embedding_dim", embedding_dim)
         mlflow.log_param("alpha", alpha)
@@ -344,25 +279,20 @@ def main():
 
         model.set_logger(loggers)
 
-        # Train the model for the desired number of timesteps.
         model.learn(total_timesteps=len(train_blocks) * 5, progress_bar=True, log_interval=1)
 
         total_correct = 0
         total_predictions = 0
-        obs = vec_test_env.reset()  # vec_test_env.reset() returns only the observations
+        obs = vec_test_env.reset()
         done = False
 
         while not done:
-            # For DummyVecEnv with one environment, obs is a list (or dict) with one element.
             actions, _ = model.predict(obs, deterministic=True)
 
-            # Retrieve the mask. This depends on how DummyVecEnv returns your observation.
-            # Here we assume obs is a list of dicts.
             mask = obs[0]["mask"] if isinstance(obs, (list, tuple)) else obs["mask"]
             total_predictions += mask.sum()
 
             obs, rewards, done, _ = vec_test_env.step(actions)
-            # rewards is an array; for a single env, we use the first element.
             total_correct += rewards[0]
 
         accuracy = total_correct / total_predictions if total_predictions > 0 else 0
