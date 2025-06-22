@@ -106,6 +106,8 @@ rf_trainer.train(X_train, X_test, y_train, y_test, grid_search, "Edge Classifica
 ```
 ### Data
 
+#### Raw Ethereum Data
+
 The `graph_reinforcement_learning_using_blockchain_data/raw_ethereum_data.py` script is used to fetch and process raw Ethereum 
 blockchain data, such as transaction receipts and ETH balances. It requires an Alchemy API URL to be set as an environment 
 variable `ALCHEMY_API_URL`.
@@ -130,6 +132,18 @@ Fetching ETH balances for accounts from `processed_receipts_class0.csv`:
 ```bash
 poetry run python graph_reinforcement_learning_using_blockchain_data/raw_ethereum_data.py --data eth_balances --input_filename receipts_class0.csv --output_filename eth_balances_class0.csv
 ```
+
+#### Processed Data
+
+The processed data is stored in the `data/processed` directory. 
+
+- **Random Forest models:** For re-creating the processed data used for the random forests, you can re-run the `1.01-features-receipts.ipynb` notebook.
+- **GNN classifier:** For re-creating the processed data used for the GNNs, you can re-run the `1.03-trx-graphs-receipts.ipynb` notebook.
+- **GNN state embeddings:** For re-creating the state embeddings used for the GNN training, you can re-run the `1.05-trx-graphs-per-acc-receipts.ipynb` notebook.
+- **AIRL state embeddings:** For re-creating the state embeddings used for the AIRL training, you can re-run
+  - Supervised Embeddings: `3.09-gnn-state-graphhs.ipynb`
+  - Unsupervised and Semi-Supervised Embeddings: `3.12-gnn-with-dgi.ipynb`
+- **AIRL transactions:** For re-creating the processed transactions used for the AIRL training, you can re-run the `1.06-airl-data.ipynb` notebook.
 
 ## Project Organization
 
