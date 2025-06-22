@@ -1,16 +1,7 @@
 [tool.poetry]
 name = "graph-reinforcement-learning-using-blockchain-data"
 version = "1.0.0"
-description = """
-This repository contains the full implementation of a research framework developed for a master’s thesis at
-the [University of Zurich (UZH)](https://www.uzh.ch/en.html), conducted within the
-[Blockchain and Distributed Ledger Technologies (BDLT)](https://www.ifi.uzh.ch/en/bdlt/index.html) group.
-The project focuses on detecting MEV arbitrage transactions on the Ethereum blockchain by combining Graph Neural Networks (GNNs)
-with Adversarial Inverse Reinforcement Learning (AIRL). It includes baseline classifiers, GNN-based embedding models, and AIRL training
-pipelines that jointly learn reward functions and policies from transaction graph data. The code supports supervised, unsupervised, and
-hybrid learning setups, enabling both classification and policy inference. It is intended to support reproducible research in MEV detection,
-transaction classification, and reinforcement learning for blockchain analytics.
-"""
+description = ""
 authors = ["Liam Tessendorf <liam.tessendorf@uzh.ch>"]
 readme = "README.md"
 
